@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:16
+    container_name: goquestly_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    container_name: goquestly_app
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "${APP_PORT}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+
+volumes:
+  pg_data:
