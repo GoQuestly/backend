@@ -1,23 +1,20 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
-    try {
-        const app = await NestFactory.create(AppModule);
+    const app = await NestFactory.create(AppModule);
 
-        await app.listen(process.env.APP_PORT || 3000, () => {
-            console.log('NestJS application started successfully!');
-        });
+    const config = new DocumentBuilder()
+        .setTitle('GoQuestly API')
+        .setDescription('API documentation for GoQuestly project')
+        .setVersion('1.0')
+        .addBearerAuth()
+        .build();
 
-    } catch (error) {
-        if (error instanceof Error) {
-            console.error('CRITICAL STARTUP ERROR:', error.stack);
-        } else {
-            console.error('CRITICAL STARTUP ERROR:', error);
-        }
-        process.exit(1);
-    }
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+
+    await app.listen(3000);
 }
-
-console.log('Happy developing ✨');
 bootstrap();
