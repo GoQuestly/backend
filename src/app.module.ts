@@ -16,6 +16,7 @@ import { QuizAnswerEntity } from "./common/entities/QuizAnswerEntity";
 import { QuizQuestionEntity } from "./common/entities/QuizQuestionEntity";
 import { UserEntity } from "./common/entities/UserEntity";
 import { UserModule } from './user/user.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
     imports: [
@@ -39,6 +40,7 @@ import { UserModule } from './user/user.module';
             ]
         }),
         UserModule,
+        AuthModule,
     ],
 })
 
