@@ -13,7 +13,7 @@ import {GoogleAuthService} from "@/auth/google.service";
     TypeOrmModule.forFeature([UserEntity]),
     PassportModule,
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'supersecret'
+      secret: process.env.JWT_SECRET
     }),
   ],
   controllers: [AuthController],

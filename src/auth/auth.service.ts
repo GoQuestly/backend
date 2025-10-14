@@ -55,11 +55,11 @@ export class AuthService {
         if (!isMatch) throw new UnauthorizedException('Invalid email or password');
 
         const payload = {sub: user.userId, email: user.email};
-        const access_token = this.jwtService.sign(payload);
+        const accessToken = this.jwtService.sign(payload);
 
         const {password, ...userData} = user;
         return {
-            access_token,
+            access_token: accessToken,
             user: userData,
         };
     }

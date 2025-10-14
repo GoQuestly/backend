@@ -40,9 +40,9 @@ export class GoogleAuthService {
         }
 
         const jwtPayload = { sub: user.userId, email: user.email };
-        const access_token = this.jwtService.sign(jwtPayload);
+        const accessToken = this.jwtService.sign(jwtPayload);
 
         const { password, ...userData } = user;
-        return { access_token, user: userData };
+        return { access_token: accessToken, user: userData };
     }
 }
