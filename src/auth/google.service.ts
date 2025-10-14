@@ -1,31 +1,44 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { OAuth2Client } from 'google-auth-library';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { UserEntity } from '@/common/entities/UserEntity';
 import { JwtService } from '@nestjs/jwt';
+import { UserEntity } from '@/common/entities/UserEntity';
 
 @Injectable()
 export class GoogleAuthService {
-    private client: OAuth2Client;
+    private client = new OAuth2Client(
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_CLIENT_SECRET,
+        process.env.GOOGLE_REDIRECT_URI,
+    );
 
     constructor(
         @InjectRepository(UserEntity)
         private readonly userRepo: Repository<UserEntity>,
         private readonly jwtService: JwtService,
-    ) {
-        this.client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+    ) {}
+
+    getAuthUrl() {
+        const scopes = ['openid', 'email', 'profile'];
+        const url = this.client.generateAuthUrl({
+            access_type: 'offline',
+            prompt: 'consent',
+            scope: scopes,
+        });
+        return { url };
     }
 
-    async verifyGoogleToken(token: string) {
+    async handleCallback(code: string) {
+        const { tokens } = await this.client.getToken(code);
+        const idToken = tokens.id_token;
+
         const ticket = await this.client.verifyIdToken({
-            idToken: token,
+            idToken,
             audience: process.env.GOOGLE_CLIENT_ID,
         });
 
         const payload = ticket.getPayload();
-        if (!payload) throw new UnauthorizedException('Invalid Google token');
-
         const { email, name, picture } = payload;
 
         let user = await this.userRepo.findOne({ where: { email } });
@@ -33,16 +46,13 @@ export class GoogleAuthService {
             user = this.userRepo.create({
                 name,
                 email,
-                photoUrl: picture || '',
                 password: '',
+                photoUrl: picture || '',
             });
-            user = await this.userRepo.save(user);
+            await this.userRepo.save(user);
         }
 
-        const jwtPayload = { sub: user.userId, email: user.email };
-        const accessToken = this.jwtService.sign(jwtPayload);
-
-        const { password, ...userData } = user;
-        return { access_token: accessToken, user: userData };
+        const access_token = this.jwtService.sign({ sub: user.userId, email });
+        return access_token;
     }
 }
