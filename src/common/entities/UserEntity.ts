@@ -19,6 +19,15 @@ export class UserEntity {
     @Column({ name: "photo_url", nullable: true })
     photoUrl: string;
 
+    @Column({ name: 'reset_password_token', nullable: true, length: 500 })
+    resetPasswordToken: string;
+
+    @Column({ name: 'reset_password_expires', nullable: true, type: 'timestamp' })
+    resetPasswordExpires: Date;
+
+    @Column({ name: 'reset_password_last_request', nullable: true, type: 'timestamp' })
+    resetPasswordLastRequest: Date;
+
     @OneToMany(() => QuestEntity, (quest) => quest.organizer)
     quests: QuestEntity[];
 
