@@ -19,7 +19,9 @@ services:
       retries: 5
 
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
     container_name: goquestly_app
     restart: always
     env_file:
@@ -30,9 +32,26 @@ services:
       db:
         condition: service_healthy
 
+    # Volumes для hot-reload
+    volumes:
+      - .:/usr/src/app
+      - /usr/src/app/node_modules
+
     environment:
       DB_HOST: db
       DB_PORT: 5432
+      NODE_ENV: development
+      # Важливо для hot-reload в Docker на Linux
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: 1000
+      WATCHPACK_POLLING: "true"
+
+    # Для інтерактивного режиму
+    stdin_open: true
+    tty: true
+
+    # Команда для development
+    command: npm run start:dev
 
 volumes:
   pg_data:
