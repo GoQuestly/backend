@@ -19,6 +19,18 @@ export class UserEntity {
     @Column({ name: "photo_url", nullable: true })
     photoUrl: string;
 
+    @Column({ name: 'is_email_verified', default: false })
+    isEmailVerified: boolean;
+
+    @Column({ name: 'email_verification_code', nullable: true, length: 6 })
+    emailVerificationCode: string;
+
+    @Column({ name: 'email_verification_code_expires', nullable: true, type: 'timestamp' })
+    emailVerificationCodeExpires: Date;
+
+    @Column({ name: 'email_verification_last_request', nullable: true, type: 'timestamp' })
+    emailVerificationLastRequest: Date;
+
     @Column({ name: 'reset_password_token', nullable: true, length: 500 })
     resetPasswordToken: string;
 
