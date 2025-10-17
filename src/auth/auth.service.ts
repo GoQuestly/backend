@@ -10,12 +10,14 @@ import {RequestPasswordResetDto, ResetPasswordDto} from './dto/reset-password.dt
 import {EmailService} from '@/email/email.service';
 import {generatePasswordResetEmailTemplate} from '@/email/templates/password-reset.template';
 import {generatePasswordChangedEmailTemplate} from '@/email/templates/password-changed.template';
+import {generateEmailVerificationTemplate} from '@/email/templates/email-verification.template';
 
 @Injectable()
 export class AuthService {
     private readonly logger = new Logger(AuthService.name);
-    private readonly RATE_LIMIT_MINUTES:number = 10;
-    private readonly TOKEN_EXPIRATION_MINUTES: number = 60;
+    private readonly RATE_LIMIT_MINUTES: number = 10;
+    private readonly VERIFICATION_CODE_EXPIRY_MINUTES: number = 10;
+    private readonly PASSWORD_RESET_TOKEN_EXPIRY_MINUTES: number = 60;
     private readonly PASSWORD_RESET_TOKEN_TYPE: string = 'password-reset';
 
     constructor(
@@ -26,6 +28,10 @@ export class AuthService {
     ) {
     }
 
+    private generateVerificationCode(): string {
+        return Math.floor(100000 + Math.random() * 900000).toString();
+    }
+
     async register(dto: RegisterDto) {
         const existing = await this.userRepo.findOne({where: {email: dto.email}});
         if (existing) throw new BadRequestException('Email already registered');
@@ -34,7 +40,7 @@ export class AuthService {
         const user = this.userRepo.create({
             name: dto.name,
             email: dto.email,
-            password: hashedPassword,
+            password: hashedPassword
         });
         const savedUser = await this.userRepo.save(user);
 
@@ -46,6 +52,7 @@ export class AuthService {
         return {
             access_token: token,
             user: userData,
+            message: 'Registration successful.'
         };
     }
 
@@ -63,6 +70,165 @@ export class AuthService {
         return {
             access_token: accessToken,
             user: userData,
+        };
+    }
+
+    async sendVerificationCodeByUserId(userId: number) {
+        const user = await this.userRepo.findOne({ where: { userId } });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        if (user.isEmailVerified) {
+            throw new BadRequestException('Email is already verified');
+        }
+
+        if (user.emailVerificationLastRequest) {
+            const now = new Date();
+            const timeSinceLastRequest = now.getTime() - user.emailVerificationLastRequest.getTime();
+            const rateLimitMs = this.RATE_LIMIT_MINUTES * 60 * 1000;
+
+            if (timeSinceLastRequest < rateLimitMs) {
+                const secondsLeft = Math.ceil((rateLimitMs - timeSinceLastRequest) / 1000);
+                const minutesLeft = Math.ceil(secondsLeft / 60);
+
+                this.logger.warn(
+                    `Email verification rate limit for ${user.email}. Wait ${minutesLeft} more minute(s)`
+                );
+
+                throw new BadRequestException(
+                    `Please wait ${minutesLeft} minute(s) before requesting a new code`
+                );
+            }
+        }
+
+        const code = this.generateVerificationCode();
+        const expiresAt = new Date(Date.now() + this.VERIFICATION_CODE_EXPIRY_MINUTES * 60 * 1000);
+
+        user.emailVerificationCode = code;
+        user.emailVerificationCodeExpires = expiresAt;
+        user.emailVerificationLastRequest = new Date();
+        await this.userRepo.save(user);
+
+        const htmlContent = generateEmailVerificationTemplate(
+            user.name,
+            code,
+            this.VERIFICATION_CODE_EXPIRY_MINUTES
+        );
+
+        try {
+            await this.emailService.sendEmail(
+                user.email,
+                'Email Verification Code - GoQuestly',
+                htmlContent
+            );
+
+            this.logger.log(`Verification code sent to ${user.email}`);
+        } catch (error) {
+            this.logger.error(`Failed to send verification code to ${user.email}`, error);
+
+            user.emailVerificationCode = null;
+            user.emailVerificationCodeExpires = null;
+            user.emailVerificationLastRequest = null;
+            await this.userRepo.save(user);
+
+            throw new BadRequestException('Failed to send verification code. Please try again later.');
+        }
+
+        const now = new Date();
+        const canResendAt = new Date(now.getTime() + this.RATE_LIMIT_MINUTES * 60 * 1000);
+
+        return {
+            success: true,
+            message: 'Verification code sent to your email',
+            expires_at: expiresAt.toISOString(),
+            can_resend_at: canResendAt.toISOString(),
+            server_time: now.toISOString(),
+        };
+    }
+
+    async verifyEmailByUserId(userId: number, code: string) {
+        const user = await this.userRepo.findOne({ where: { userId } });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        if (user.isEmailVerified) {
+            return {
+                success: true,
+                message: 'Email is already verified',
+            };
+        }
+
+        if (!user.emailVerificationCode || !user.emailVerificationCodeExpires) {
+            throw new BadRequestException('No verification code found. Please request a new one.');
+        }
+
+        if (user.emailVerificationCodeExpires < new Date()) {
+            throw new BadRequestException('Verification code has expired. Please request a new one.');
+        }
+
+        if (user.emailVerificationCode !== code) {
+            this.logger.warn(`Invalid verification code attempt for ${user.email}`);
+            throw new BadRequestException('Invalid verification code');
+        }
+
+        user.isEmailVerified = true;
+        user.emailVerificationCode = null;
+        user.emailVerificationCodeExpires = null;
+        await this.userRepo.save(user);
+
+        this.logger.log(`Email verified successfully for ${user.email}`);
+
+        return {
+            success: true,
+            message: 'Email verified successfully',
+        };
+    }
+
+    async checkVerificationStatusByUserId(userId: number) {
+        const user = await this.userRepo.findOne({ where: { userId } });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        const now = new Date();
+
+        if (user.isEmailVerified) {
+            return {
+                is_verified: true,
+            };
+        }
+
+        let canResendAt: string | null = null;
+        let canResendCode = true;
+
+        if (user.emailVerificationLastRequest) {
+            const resendAvailableAt = new Date(
+                user.emailVerificationLastRequest.getTime() + this.RATE_LIMIT_MINUTES * 60 * 1000
+            );
+
+            if (now < resendAvailableAt) {
+                canResendCode = false;
+                canResendAt = resendAvailableAt.toISOString();
+            }
+        }
+
+        let codeExpiresAt: string | null = null;
+
+        if (user.emailVerificationCodeExpires && user.emailVerificationCodeExpires > now) {
+            codeExpiresAt = user.emailVerificationCodeExpires.toISOString();
+        }
+
+        return {
+            is_verified: false,
+            can_resend_code: canResendCode,
+            can_resend_at: canResendAt,
+            code_expires_at: codeExpiresAt,
+            server_time: now.toISOString(),
         };
     }
 
@@ -100,13 +266,13 @@ export class AuthService {
         const resetToken = this.jwtService.sign(
             {userId: user.userId, email: user.email, type: this.PASSWORD_RESET_TOKEN_TYPE},
             {
-                expiresIn: `${this.TOKEN_EXPIRATION_MINUTES}m`,
+                expiresIn: `${this.PASSWORD_RESET_TOKEN_EXPIRY_MINUTES}m`,
                 secret: process.env.JWT_RESET_SECRET,
             }
         );
 
         user.resetPasswordToken = resetToken;
-        user.resetPasswordExpires = new Date(Date.now() + this.TOKEN_EXPIRATION_MINUTES * 60 * 1000);
+        user.resetPasswordExpires = new Date(Date.now() + this.PASSWORD_RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000);
         user.resetPasswordLastRequest = new Date();
         await this.userRepo.save(user);
 
@@ -205,14 +371,12 @@ export class AuthService {
     }
 
     async verifyResetToken(token: string) {
-
         let payload: { type: string; userId: any; };
 
         try {
             payload = this.jwtService.verify(token, {
                 secret: process.env.JWT_RESET_SECRET || process.env.JWT_SECRET
             });
-
         } catch (error) {
             throw new BadRequestException('Invalid or expired token');
         }

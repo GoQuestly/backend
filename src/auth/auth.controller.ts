@@ -1,11 +1,13 @@
-import { Controller, Post, Body, Get, Query, Res, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { Controller, Post, Body, Get, Query, Res, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/RegisterDto';
 import { LoginDto } from "@/auth/dto/LoginDto";
 import { RequestPasswordResetDto, ResetPasswordDto, VerifyResetTokenDto } from './dto/reset-password.dto';
+import { VerifyEmailDto } from './dto/email-verification.dto';
 import { GoogleAuthService } from './google.service';
 import { Response } from 'express';
+import {JwtAuthGuard} from "@/auth/jwt-auth.guard";
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -41,6 +43,30 @@ export class AuthController {
             console.error('Google auth error:', error);
             return res.redirect(`${process.env.FRONTEND_URL}/auth/error`);
         }
+    }
+
+    @Post('send-verification-code')
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    async sendVerificationCode(@Req() req: any) {
+        return this.authService.sendVerificationCodeByUserId(req.user.userId);
+    }
+
+    @Post('verify-email')
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    async verifyEmail(@Req() req: any, @Body() dto: VerifyEmailDto) {
+        return this.authService.verifyEmailByUserId(req.user.userId, dto.code);
+    }
+
+    @Get('verification-status')
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth()
+    async checkVerificationStatus(@Req() req: any) {
+        return this.authService.checkVerificationStatusByUserId(req.user.userId);
     }
 
     @Post('request-password-reset')

@@ -1,9 +1,9 @@
-import { Injectable } from '@nestjs/common';
-import { OAuth2Client } from 'google-auth-library';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { JwtService } from '@nestjs/jwt';
-import { UserEntity } from '@/common/entities/UserEntity';
+import {Injectable} from '@nestjs/common';
+import {OAuth2Client} from 'google-auth-library';
+import {InjectRepository} from '@nestjs/typeorm';
+import {Repository} from 'typeorm';
+import {JwtService} from '@nestjs/jwt';
+import {UserEntity} from '@/common/entities/UserEntity';
 
 @Injectable()
 export class GoogleAuthService {
@@ -42,17 +42,23 @@ export class GoogleAuthService {
         const { email, name, picture } = payload;
 
         let user = await this.userRepo.findOne({ where: { email } });
+
         if (!user) {
             user = this.userRepo.create({
                 name,
                 email,
                 password: '',
                 photoUrl: picture || '',
+                isEmailVerified: true,
             });
+            await this.userRepo.save(user);
+        } else if (!user.isEmailVerified) {
+            user.isEmailVerified = true;
+            user.emailVerificationCode = null;
+            user.emailVerificationCodeExpires = null;
             await this.userRepo.save(user);
         }
 
-        const access_token = this.jwtService.sign({ sub: user.userId, email });
-        return access_token;
+        return this.jwtService.sign({sub: user.userId, email});
     }
 }
