@@ -1,4 +1,11 @@
-import {BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException} from '@nestjs/common';
+import {
+    BadRequestException,
+    Inject,
+    Injectable,
+    Logger,
+    NotFoundException,
+    UnauthorizedException
+} from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
 import {Repository} from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -11,6 +18,10 @@ import {EmailService} from '@/email/email.service';
 import {generatePasswordResetEmailTemplate} from '@/email/templates/password-reset.template';
 import {generatePasswordChangedEmailTemplate} from '@/email/templates/password-changed.template';
 import {generateEmailVerificationTemplate} from '@/email/templates/email-verification.template';
+import {UserDto} from "@/common/dto/user.dto";
+import {getAbsoluteUrl} from "@/common/utils/url.util";
+import {REQUEST} from "@nestjs/core";
+import {Request} from "express";
 
 @Injectable()
 export class AuthService {
@@ -25,11 +36,22 @@ export class AuthService {
         private readonly userRepo: Repository<UserEntity>,
         private readonly jwtService: JwtService,
         private readonly emailService: EmailService,
+        @Inject(REQUEST) private readonly request: Request,
     ) {
     }
 
     private generateVerificationCode(): string {
         return Math.floor(100000 + Math.random() * 900000).toString();
+    }
+
+    private mapToUserDto(user: UserEntity): UserDto {
+        return {
+            userId: user.userId,
+            email: user.email,
+            name: user.name,
+            photoUrl: getAbsoluteUrl(this.request, user.photoUrl),
+            isEmailVerified: user.isEmailVerified,
+        };
     }
 
     async register(dto: RegisterDto) {
@@ -47,11 +69,9 @@ export class AuthService {
         const payload = {sub: savedUser.userId, email: savedUser.email};
         const token = this.jwtService.sign(payload);
 
-        const {password, ...userData} = savedUser;
-
         return {
             access_token: token,
-            user: userData,
+            user: this.mapToUserDto(savedUser),
             message: 'Registration successful.'
         };
     }
@@ -66,10 +86,9 @@ export class AuthService {
         const payload = {sub: user.userId, email: user.email};
         const accessToken = this.jwtService.sign(payload);
 
-        const {password, ...userData} = user;
         return {
             access_token: accessToken,
-            user: userData,
+            user: this.mapToUserDto(user),
         };
     }
 

@@ -18,6 +18,7 @@ import { UserEntity } from "./common/entities/UserEntity";
 import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import {EmailModule} from "@/email/email.module";
+import {ProfileModule} from "@/profile/profile.module";
 
 @Module({
     imports: [
@@ -42,7 +43,8 @@ import {EmailModule} from "@/email/email.module";
         }),
         UserModule,
         AuthModule,
-        EmailModule
+        EmailModule,
+        ProfileModule,
     ],
 })
 
