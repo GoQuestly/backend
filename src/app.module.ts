@@ -18,7 +18,7 @@ import { UserEntity } from "./common/entities/UserEntity";
 import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import {EmailModule} from "@/email/email.module";
-import {ProfileModule} from "@/profile/profile.module";
+import {QuestModule} from './quest/quest.module';
 
 @Module({
     imports: [
@@ -44,7 +44,8 @@ import {ProfileModule} from "@/profile/profile.module";
         UserModule,
         AuthModule,
         EmailModule,
-        ProfileModule,
+        UserModule,
+        QuestModule,
     ],
 })
 
