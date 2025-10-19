@@ -1,4 +1,17 @@
-import { Controller, Post, Body, Get, Query, Res, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
+import {
+    Controller,
+    Post,
+    Body,
+    Get,
+    Query,
+    Res,
+    HttpCode,
+    HttpStatus,
+    UseGuards,
+    Req,
+    Logger,
+    UnauthorizedException
+} from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/RegisterDto';
@@ -6,12 +19,15 @@ import { LoginDto } from "@/auth/dto/LoginDto";
 import { RequestPasswordResetDto, ResetPasswordDto, VerifyResetTokenDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/email-verification.dto';
 import { GoogleAuthService } from './google.service';
+import {GoogleLoginDto} from './dto/GoogleLoginDto';
 import { Response } from 'express';
 import {JwtAuthGuard} from "@/auth/jwt-auth.guard";
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
+    private readonly logger = new Logger(AuthController.name);
+
     constructor(
         private readonly googleService: GoogleAuthService,
         private readonly authService: AuthService
@@ -42,6 +58,17 @@ export class AuthController {
         } catch (error) {
             console.error('Google auth error:', error);
             return res.redirect(`${process.env.FRONTEND_URL}/auth/error`);
+        }
+    }
+
+    @Post('google/mobile')
+    @HttpCode(HttpStatus.OK)
+    async googleMobileLogin(@Body() dto: GoogleLoginDto) {
+        try {
+            return await this.googleService.verifyMobileToken(dto.token);
+        } catch (error) {
+            this.logger.error('Google mobile auth error:', error);
+            throw new UnauthorizedException('Invalid Google token');
         }
     }
 
