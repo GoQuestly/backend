@@ -33,7 +33,7 @@ export class QuestController {
     constructor(private readonly questService: QuestService) {
     }
 
-    @Post('quest')
+    @Post('organizer/quest')
     async createQuest(
         @GetUser('userId') userId: number,
         @Body() createQuestDto: CreateQuestDto,
@@ -41,19 +41,20 @@ export class QuestController {
         return this.questService.createQuest(userId, createQuestDto);
     }
 
-    @Get('quests')
+    @Get('organizer/quests')
     async getUserQuests(@GetUser('userId') userId: number): Promise<QuestResponseDto[]> {
         return this.questService.getUserQuests(userId);
     }
 
-    @Get('quest/:questId')
-    async getQuest(
+    @Get('organizer/quest/:questId')
+    async getOrganizerQuest(
         @Param('questId', ParseIntPipe) questId: number,
+        @GetUser('userId') userId: number,
     ): Promise<QuestResponseDto> {
-        return this.questService.getQuest(questId);
+        return this.questService.getOrganizerQuest(questId, userId);
     }
 
-    @Patch('quest/:questId')
+    @Patch('organizer/quest/:questId')
     async updateQuest(
         @Param('questId', ParseIntPipe) questId: number,
         @GetUser('userId') userId: number,
@@ -62,7 +63,7 @@ export class QuestController {
         return this.questService.updateQuest(questId, userId, updateQuestDto);
     }
 
-    @Delete('quest/:questId')
+    @Delete('organizer/quest/:questId')
     @HttpCode(HttpStatus.NO_CONTENT)
     async deleteQuest(
         @Param('questId', ParseIntPipe) questId: number,
@@ -71,7 +72,7 @@ export class QuestController {
         return this.questService.deleteQuest(questId, userId);
     }
 
-    @Post('quest/:questId/cover-image')
+    @Post('organizer/quest/:questId/cover-image')
     @FileUpload(QUEST_COVER_UPLOAD_CONFIG, 'Quest cover image (PNG, JPG, GIF up to 10MB)')
     async uploadCoverImage(
         @Param('questId', ParseIntPipe) questId: number,
