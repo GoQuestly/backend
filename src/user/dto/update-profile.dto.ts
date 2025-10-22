@@ -1,4 +1,4 @@
-import {IsString, IsOptional, MaxLength} from 'class-validator';
+import {IsString, IsOptional, MaxLength, IsNotEmpty} from 'class-validator';
 import {ApiPropertyOptional} from '@nestjs/swagger';
 
 export class UpdateProfileDto {
@@ -9,6 +9,7 @@ export class UpdateProfileDto {
     })
     @IsOptional()
     @IsString()
+    @IsNotEmpty()
     @MaxLength(100, {message: 'Name must not exceed 100 characters'})
     name?: string;
 }
