@@ -295,7 +295,7 @@ export class AuthService {
         user.resetPasswordLastRequest = new Date();
         await this.userRepo.save(user);
 
-        const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+        const resetUrl = `${process.env.FRONTEND_URL}/change-password?token=${resetToken}`;
         const htmlContent = generatePasswordResetEmailTemplate(user.name, resetUrl);
 
         try {
