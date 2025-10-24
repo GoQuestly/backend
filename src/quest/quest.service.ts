@@ -55,8 +55,9 @@ export class QuestService {
         return this.mapQuestToResponse(savedQuest);
     }
 
-    async getQuest(questId: number): Promise<QuestResponseDto> {
+    async getOrganizerQuest(questId: number, userId: number): Promise<QuestResponseDto> {
         const quest = await this.findQuestWithOrganizer(questId);
+        this.verifyQuestOwnership(quest, userId);
         return this.mapQuestToResponse(quest);
     }
 

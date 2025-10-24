@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, Length, Matches } from 'class-validator';
+import {IsNotEmpty, IsString, Length} from 'class-validator';
 
 export class VerifyEmailDto {
     @ApiProperty({
@@ -8,7 +8,6 @@ export class VerifyEmailDto {
     })
     @IsString()
     @Length(6, 6, { message: 'Verification code must be exactly 6 digits' })
-    @Matches(/^\d{6}$/, { message: 'Verification code must contain only digits' })
     @IsNotEmpty()
     readonly code: string;
 }
