@@ -12,12 +12,16 @@ import {
     BadRequestException,
     HttpCode,
     HttpStatus,
+    Query,
+    ValidationPipe,
 } from '@nestjs/common';
-import {ApiTags, ApiBearerAuth} from '@nestjs/swagger';
+import {ApiTags, ApiBearerAuth, ApiExtraModels} from '@nestjs/swagger';
 import {QuestService} from './quest.service';
 import {CreateQuestDto} from './dto/create-quest.dto';
 import {UpdateQuestDto} from './dto/update-quest.dto';
 import {QuestResponseDto} from './dto/quest-response.dto';
+import {PaginatedQuestsResponseDto} from './dto/paginated-quests-response.dto';
+import {GetUserQuestsQueryDto} from './dto/get-user-quests-query.dto';
 import {JwtAuthGuard} from '@/auth/jwt-auth.guard';
 import {GetUser} from '@/auth/decorators/get-user.decorator';
 import {FileUpload} from '@/common/decorators/file-upload.decorator';
@@ -27,6 +31,7 @@ import type {File} from 'multer';
 
 @ApiTags('Quest')
 @ApiBearerAuth()
+@ApiExtraModels(GetUserQuestsQueryDto)
 @Controller()
 @UseGuards(JwtAuthGuard)
 export class QuestController {
@@ -42,8 +47,15 @@ export class QuestController {
     }
 
     @Get('organizer/quests')
-    async getUserQuests(@GetUser('userId') userId: number): Promise<QuestResponseDto[]> {
-        return this.questService.getUserQuests(userId);
+    async getUserQuests(
+        @GetUser('userId') userId: number,
+        @Query(new ValidationPipe({transform: true, whitelist: true})) query: GetUserQuestsQueryDto,
+    ): Promise<PaginatedQuestsResponseDto> {
+        const {search, pageNumber = 1, pageSize = 10} = query;
+        const maxPageSize = 100;
+        const finalPageSize = Math.min(pageSize, maxPageSize);
+
+        return this.questService.getUserQuests(userId, pageNumber, finalPageSize, search);
     }
 
     @Get('organizer/quest/:questId')

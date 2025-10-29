@@ -8,9 +8,9 @@ import {UpdateQuestDto} from './dto/update-quest.dto';
 import {QuestResponseDto} from './dto/quest-response.dto';
 import * as fs from 'fs';
 import * as path from 'path';
-import {getAbsoluteUrl} from "@/common/utils/url.util";
-import {REQUEST} from "@nestjs/core";
-import {Request} from "express";
+import {getAbsoluteUrl} from '@/common/utils/url.util';
+import {REQUEST} from '@nestjs/core';
+import {Request} from 'express';
 
 @Injectable()
 export class QuestService {
@@ -61,14 +61,36 @@ export class QuestService {
         return this.mapQuestToResponse(quest);
     }
 
-    async getUserQuests(userId: number): Promise<QuestResponseDto[]> {
-        const quests = await this.questRepository.find({
-            where: {organizer: {userId}},
-            relations: ['organizer'],
-            order: {creationDate: 'DESC'},
-        });
+    async getUserQuests(
+        userId: number,
+        pageNumber = 1,
+        pageSize = 10,
+        search?: string,
+    ): Promise<{ items: QuestResponseDto[]; total: number; pageNumber: number; pageSize: number }> {
+        const qb = this.questRepository.createQueryBuilder('quest')
+            .leftJoinAndSelect('quest.organizer', 'organizer')
+            .where('organizer.userId = :userId', {userId});
 
-        return quests.map((quest) => this.mapQuestToResponse(quest));
+        if (search && search.trim().length > 0) {
+            const q = `%${search.trim()}%`;
+            qb.andWhere('(quest.title ILIKE :q OR quest.description ILIKE :q)', {q});
+        }
+
+        qb.orderBy('quest.updateDate', 'DESC')
+            .addOrderBy('quest.creationDate', 'DESC')
+            .skip((pageNumber - 1) * pageSize)
+            .take(pageSize);
+
+        const [entities, total] = await qb.getManyAndCount();
+
+        const items = entities.map((quest) => this.mapQuestToResponse(quest));
+
+        return {
+            items,
+            total,
+            pageNumber,
+            pageSize,
+        };
     }
 
     async updateQuest(
