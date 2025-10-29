@@ -20,6 +20,7 @@ import { AuthModule } from './auth/auth.module';
 import {EmailModule} from "@/email/email.module";
 import {QuestModule} from './quest/quest.module';
 import {QuestPointModule} from "@/quest/quest-point.module";
+import {QuestTaskModule} from "@/quest/quest-task.module";
 
 @Module({
     imports: [
@@ -48,6 +49,7 @@ import {QuestPointModule} from "@/quest/quest-point.module";
         UserModule,
         QuestModule,
         QuestPointModule,
+        QuestTaskModule,
     ],
 })
 
