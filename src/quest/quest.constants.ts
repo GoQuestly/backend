@@ -1,0 +1,1 @@
+export const MAX_TASK_DURATION_SECONDS = 30 * 60;
