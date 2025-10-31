@@ -1,4 +1,4 @@
-import {Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, OneToOne} from 'typeorm';
+import {Entity, PrimaryGeneratedColumn, Column, OneToMany, OneToOne} from 'typeorm';
 import { QuestPointEntity } from './QuestPointEntity';
 import { QuizQuestionEntity } from './QuizQuestionEntity';
 import { ParticipantTaskEntity } from './ParticipantTaskEntity';
@@ -30,7 +30,7 @@ export class QuestTaskEntity {
     @Column({ name: "is_required_for_next_point"})
     isRequiredForNextPoint: boolean;
 
-    @OneToOne(() => QuestPointEntity, (p) => p.tasks)
+    @OneToOne(() => QuestPointEntity, (p) => p.task)
     point: QuestPointEntity;
 
     @OneToMany(() => QuizQuestionEntity, (q) => q.task)

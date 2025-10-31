@@ -1,4 +1,4 @@
-import {Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, OneToOne} from 'typeorm';
+import {Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, OneToOne, JoinColumn} from 'typeorm';
 import { QuestEntity } from './QuestEntity';
 import { QuestTaskEntity } from './QuestTaskEntity';
 import {ParticipantPointEntity} from "@/common/entities/ParticipantPointEntity";
@@ -23,8 +23,15 @@ export class QuestPointEntity {
     @ManyToOne(() => QuestEntity, (quest) => quest.points)
     quest: QuestEntity;
 
-    @OneToOne(() => QuestTaskEntity, (task) => task.point)
-    tasks: QuestTaskEntity[];
+    @Column({ name: "quest_task_id", unique: true, nullable: true })
+    questTaskId: number;
+
+    @OneToOne(() => QuestTaskEntity, (task) => task.point, {
+        cascade: true,
+        onDelete: 'SET NULL'
+    })
+    @JoinColumn({ name: "quest_task_id" })
+    task: QuestTaskEntity;
 
     @OneToMany(() => ParticipantPointEntity, (pp) => pp.point)
     participantPoints: ParticipantPointEntity[];

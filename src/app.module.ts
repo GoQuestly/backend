@@ -19,6 +19,9 @@ import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import {EmailModule} from "@/email/email.module";
 import {QuestModule} from './quest/quest.module';
+import {QuestPointModule} from "@/quest-point/quest-point.module";
+import {QuestTaskModule} from "@/quest-task/quest-task.module";
+import {QuestSessionModule} from "@/quest-session/quest-session.module";
 
 @Module({
     imports: [
@@ -38,7 +41,7 @@ import {QuestModule} from './quest/quest.module';
                 QuestTaskEntity,
                 QuizAnswerEntity,
                 QuizQuestionEntity,
-                UserEntity
+                UserEntity,
             ]
         }),
         UserModule,
@@ -46,6 +49,9 @@ import {QuestModule} from './quest/quest.module';
         EmailModule,
         UserModule,
         QuestModule,
+        QuestPointModule,
+        QuestTaskModule,
+        QuestSessionModule,
     ],
 })
 
