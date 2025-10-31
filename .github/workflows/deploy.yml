@@ -61,6 +61,6 @@ jobs:
             cd ${{ secrets.DEPLOY_PATH }}
             docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            docker-compose down
-            docker-compose up -d
+            docker compose down
+            docker compose up -d
             docker image prune -f

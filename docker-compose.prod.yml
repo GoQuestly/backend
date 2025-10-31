@@ -18,7 +18,7 @@ services:
       retries: 5
 
   app:
-    image: ghcr.io/GoQuestly/backend:latest
+    image: ghcr.io/goquestly/backend:latest
     container_name: goquestly_app
     restart: always
     env_file:
