@@ -11,7 +11,7 @@ import {
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import { QuestTaskType } from '@/common/enums/QuestTaskType';
-import { MAX_TASK_DURATION_SECONDS } from "@/quest/quest.constants";
+import { MAX_TASK_DURATION_SECONDS } from "@/quest-task/quest-task.constants";
 
 export class QuizAnswerDto {
     @ApiProperty({ example: 'London' })

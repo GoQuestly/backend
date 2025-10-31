@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { QuestTaskEntity } from '@/common/entities/QuestTaskEntity';
@@ -33,14 +33,18 @@ export class QuestTaskService {
         private questPointRepository: Repository<QuestPointEntity>,
     ) {}
 
-    private async validateQuestPointHasNoTask(questPointId: number): Promise<QuestPointEntity> {
+    private async validateQuestPointHasNoTask(questPointId: number, organizerId: number): Promise<QuestPointEntity> {
         const questPoint = await this.questPointRepository.findOne({
             where: { questPointId },
-            relations: ['task'],
+            relations: ['task', 'quest', 'quest.organizer'],
         });
 
         if (!questPoint) {
             throw new NotFoundException(`Quest point with ID ${questPointId} not found`);
+        }
+
+        if (questPoint.quest.organizer.userId !== organizerId) {
+            throw new ForbiddenException('Only the quest organizer can create tasks for quest points');
         }
 
         if (questPoint.task) {
@@ -50,8 +54,8 @@ export class QuestTaskService {
         return questPoint;
     }
 
-    async createQuizTask(dto: CreateQuizTaskDto, questPointId: number): Promise<QuizTaskResponseDto> {
-        const questPoint = await this.validateQuestPointHasNoTask(questPointId);
+    async createQuizTask(dto: CreateQuizTaskDto, questPointId: number, organizerId: number): Promise<QuizTaskResponseDto> {
+        const questPoint = await this.validateQuestPointHasNoTask(questPointId, organizerId);
 
         const questTask = this.questTaskRepository.create({
             taskType: QuestTaskType.QUIZ,
@@ -67,11 +71,11 @@ export class QuestTaskService {
         await this.questTaskRepository.save(questTask);
         await this.createQuizQuestions(questTask, dto.quizQuestions);
 
-        return this.findById(questTask.questTaskId) as Promise<QuizTaskResponseDto>;
+        return this.findById(questTask.questTaskId, organizerId) as Promise<QuizTaskResponseDto>;
     }
 
-    async createCodeWordTask(dto: CreateCodeWordTaskDto, questPointId: number): Promise<CodeWordTaskResponseDto> {
-        const questPoint = await this.validateQuestPointHasNoTask(questPointId);
+    async createCodeWordTask(dto: CreateCodeWordTaskDto, questPointId: number, organizerId: number): Promise<CodeWordTaskResponseDto> {
+        const questPoint = await this.validateQuestPointHasNoTask(questPointId, organizerId);
 
         const questTask = await this.questTaskRepository.save({
             taskType: QuestTaskType.CODE_WORD,
@@ -84,11 +88,11 @@ export class QuestTaskService {
             successScorePointsPercent: 100,
         });
 
-        return this.findById(questTask.questTaskId) as Promise<CodeWordTaskResponseDto>;
+        return this.findById(questTask.questTaskId, organizerId) as Promise<CodeWordTaskResponseDto>;
     }
 
-    async createPhotoTask(dto: CreatePhotoTaskDto, questPointId: number): Promise<PhotoTaskResponseDto> {
-        const questPoint = await this.validateQuestPointHasNoTask(questPointId);
+    async createPhotoTask(dto: CreatePhotoTaskDto, questPointId: number, organizerId: number): Promise<PhotoTaskResponseDto> {
+        const questPoint = await this.validateQuestPointHasNoTask(questPointId, organizerId);
 
         const questTask = await this.questTaskRepository.save({
             taskType: QuestTaskType.PHOTO,
@@ -101,7 +105,7 @@ export class QuestTaskService {
             successScorePointsPercent: 100,
         });
 
-        return this.findById(questTask.questTaskId) as Promise<PhotoTaskResponseDto>;
+        return this.findById(questTask.questTaskId, organizerId) as Promise<PhotoTaskResponseDto>;
     }
 
     private async createQuizQuestions(task: QuestTaskEntity, questions: QuizQuestionDto[]): Promise<void> {
@@ -127,35 +131,35 @@ export class QuestTaskService {
         }
     }
 
-    async findById(id: number): Promise<QuestTaskResponseDto> {
+    async findById(id: number, organizerId: number): Promise<QuestTaskResponseDto> {
         const task = await this.questTaskRepository.findOne({
             where: { questTaskId: id },
-            relations: ['quizQuestions', 'quizQuestions.answers'],
+            relations: ['quizQuestions', 'quizQuestions.answers', 'point', 'point.quest', 'point.quest.organizer'],
         });
 
         if (!task) {
             throw new NotFoundException(`Quest task with ID ${id} not found`);
         }
 
+        if (task.point.quest.organizer.userId !== organizerId) {
+            throw new ForbiddenException('Only the quest organizer can view quest tasks');
+        }
+
         return this.mapToResponseDto(task);
     }
 
-    async findAll(): Promise<QuestTaskResponseDto[]> {
-        const tasks = await this.questTaskRepository.find({
-            relations: ['quizQuestions', 'quizQuestions.answers'],
-        });
-
-        return tasks.map(task => this.mapToResponseDto(task));
-    }
-
-    async updateQuizTask(id: number, dto: UpdateQuizTaskDto): Promise<QuizTaskResponseDto> {
+    async updateQuizTask(id: number, dto: UpdateQuizTaskDto, organizerId: number): Promise<QuizTaskResponseDto> {
         const task = await this.questTaskRepository.findOne({
             where: { questTaskId: id },
-            relations: ['quizQuestions', 'quizQuestions.answers'],
+            relations: ['quizQuestions', 'quizQuestions.answers', 'point', 'point.quest', 'point.quest.organizer'],
         });
 
         if (!task) {
             throw new NotFoundException(`Quest task with ID ${id} not found`);
+        }
+
+        if (task.point.quest.organizer.userId !== organizerId) {
+            throw new ForbiddenException('Only the quest organizer can update quest tasks');
         }
 
         if (task.taskType !== QuestTaskType.QUIZ) {
@@ -175,16 +179,21 @@ export class QuestTaskService {
         await this.quizQuestionRepository.delete({ task: { questTaskId: id } });
         await this.createQuizQuestions(task, dto.quizQuestions);
 
-        return this.findById(id) as Promise<QuizTaskResponseDto>;
+        return this.findById(id, organizerId) as Promise<QuizTaskResponseDto>;
     }
 
-    async updateCodeWordTask(id: number, dto: UpdateCodeWordTaskDto): Promise<CodeWordTaskResponseDto> {
+    async updateCodeWordTask(id: number, dto: UpdateCodeWordTaskDto, organizerId: number): Promise<CodeWordTaskResponseDto> {
         const task = await this.questTaskRepository.findOne({
             where: { questTaskId: id },
+            relations: ['point', 'point.quest', 'point.quest.organizer'],
         });
 
         if (!task) {
             throw new NotFoundException(`Quest task with ID ${id} not found`);
+        }
+
+        if (task.point.quest.organizer.userId !== organizerId) {
+            throw new ForbiddenException('Only the quest organizer can update quest tasks');
         }
 
         if (task.taskType !== QuestTaskType.CODE_WORD) {
@@ -201,16 +210,21 @@ export class QuestTaskService {
 
         await this.questTaskRepository.save(task);
 
-        return this.findById(id) as Promise<CodeWordTaskResponseDto>;
+        return this.findById(id, organizerId) as Promise<CodeWordTaskResponseDto>;
     }
 
-    async updatePhotoTask(id: number, dto: UpdatePhotoTaskDto): Promise<PhotoTaskResponseDto> {
+    async updatePhotoTask(id: number, dto: UpdatePhotoTaskDto, organizerId: number): Promise<PhotoTaskResponseDto> {
         const task = await this.questTaskRepository.findOne({
             where: { questTaskId: id },
+            relations: ['point', 'point.quest', 'point.quest.organizer'],
         });
 
         if (!task) {
             throw new NotFoundException(`Quest task with ID ${id} not found`);
+        }
+
+        if (task.point.quest.organizer.userId !== organizerId) {
+            throw new ForbiddenException('Only the quest organizer can update quest tasks');
         }
 
         if (task.taskType !== QuestTaskType.PHOTO) {
@@ -226,16 +240,21 @@ export class QuestTaskService {
 
         await this.questTaskRepository.save(task);
 
-        return this.findById(id) as Promise<PhotoTaskResponseDto>;
+        return this.findById(id, organizerId) as Promise<PhotoTaskResponseDto>;
     }
 
-    async delete(id: number): Promise<void> {
+    async delete(id: number, organizerId: number): Promise<void> {
         const task = await this.questTaskRepository.findOne({
             where: { questTaskId: id },
+            relations: ['point', 'point.quest', 'point.quest.organizer'],
         });
 
         if (!task) {
             throw new NotFoundException(`Quest task with ID ${id} not found`);
+        }
+
+        if (task.point.quest.organizer.userId !== organizerId) {
+            throw new ForbiddenException('Only the quest organizer can delete quest tasks');
         }
 
         await this.questTaskRepository.remove(task);
