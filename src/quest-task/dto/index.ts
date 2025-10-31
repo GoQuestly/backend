@@ -1,6 +1,6 @@
-import {QuizTaskResponseDto} from "@/quest/dto/quiz-task.dto";
-import {CodeWordTaskResponseDto} from "@/quest/dto/code-word-task.dto";
-import {PhotoTaskResponseDto} from "@/quest/dto/photo-task.dto";
+import {QuizTaskResponseDto} from "@/quest-task/dto/quiz-task.dto";
+import {CodeWordTaskResponseDto} from "@/quest-task/dto/code-word-task.dto";
+import {PhotoTaskResponseDto} from "@/quest-task/dto/photo-task.dto";
 
 export * from './quiz-task.dto';
 export * from './code-word-task.dto';

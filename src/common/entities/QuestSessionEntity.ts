@@ -8,13 +8,10 @@ export class QuestSessionEntity {
     @PrimaryGeneratedColumn({ name: "quest_session_id" })
     questSessionId: number;
 
-    @ManyToOne(() => QuestEntity, (quest) => quest.sessions)
-    quest: QuestEntity;
-
     @Column({ name: "start_date" })
     startDate: Date;
 
-    @Column({ name: "end_date" })
+    @Column({ name: "end_date", nullable: true })
     endDate: Date;
 
     @Column({ name: "end_reason", nullable: true, enum: QuestSessionEndReason, type: "enum" })
@@ -25,4 +22,7 @@ export class QuestSessionEntity {
 
     @OneToMany(() => ParticipantEntity, (p) => p.session)
     participants: ParticipantEntity[];
+
+    @ManyToOne(() => QuestEntity, (quest) => quest.sessions, { onDelete: 'CASCADE' })
+    quest: QuestEntity;
 }

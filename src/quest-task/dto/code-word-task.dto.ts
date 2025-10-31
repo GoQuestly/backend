@@ -1,10 +1,10 @@
 import { IsInt, IsString, IsBoolean, Min, IsNotEmpty, Max } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { QuestTaskType } from '@/common/enums/QuestTaskType';
-import { MAX_TASK_DURATION_SECONDS } from "@/quest/quest.constants";
+import { MAX_TASK_DURATION_SECONDS } from "@/quest-task/quest-task.constants";
 
-export class BasePhotoTaskDto {
-    @ApiProperty({ example: 'Take a photo at the landmark', required: false })
+export class BaseCodeWordTaskDto {
+    @ApiProperty({ example: 'Find the code word hidden in the location', required: false })
     @IsString()
     @IsNotEmpty()
     description?: string;
@@ -23,18 +23,23 @@ export class BasePhotoTaskDto {
     @IsInt()
     @Min(0)
     scorePointsCount?: number;
+
+    @ApiProperty({ example: 'SECRET123' })
+    @IsString()
+    @IsNotEmpty()
+    codeWord?: string;
 }
 
-export class CreatePhotoTaskDto extends BasePhotoTaskDto {}
+export class CreateCodeWordTaskDto extends BaseCodeWordTaskDto {}
 
-export class UpdatePhotoTaskDto extends BasePhotoTaskDto {}
+export class UpdateCodeWordTaskDto extends BaseCodeWordTaskDto {}
 
-export class PhotoTaskResponseDto {
+export class CodeWordTaskResponseDto {
     @ApiProperty()
     questTaskId: number;
 
-    @ApiProperty({ enum: QuestTaskType, example: QuestTaskType.PHOTO })
-    taskType: QuestTaskType.PHOTO;
+    @ApiProperty({ enum: QuestTaskType, example: QuestTaskType.CODE_WORD })
+    taskType: QuestTaskType.CODE_WORD;
 
     @ApiProperty({ required: false })
     description?: string;
@@ -47,4 +52,7 @@ export class PhotoTaskResponseDto {
 
     @ApiProperty({ example: 100 })
     scorePointsCount: number;
+
+    @ApiProperty({ example: 'SECRET123' })
+    codeWord: string;
 }
