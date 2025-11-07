@@ -16,12 +16,10 @@ import { ApiTags, ApiBearerAuth, ApiExtraModels } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@/auth/jwt-auth.guard';
 import { GetUser } from '@/auth/decorators/get-user.decorator';
 import { QuestSessionService } from './quest-session.service';
-import {
-    JoinSessionDto,
-    QuestSessionResponseDto,
-    GetMySessionsQueryDto,
-    PaginatedMySessionsResponseDto,
-} from './dto/quest-session.dto';
+import { JoinSessionDto } from "@/quest-session/dto/join-session.dto";
+import { GetMySessionsQueryDto } from "@/quest-session/dto/get-my-sessions-query.dto";
+import { QuestSessionResponseDto } from "@/quest-session/dto/quest-session-response.dto";
+import { PaginatedMySessionsResponseDto } from "@/quest-session/dto/paginated-my-sessions-response.dto";
 
 @ApiTags('Participant - Quest Sessions')
 @ApiBearerAuth()
