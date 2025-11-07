@@ -12,13 +12,12 @@ import { ParticipantEntity } from '@/common/entities/ParticipantEntity';
 import { QuestEntity } from '@/common/entities/QuestEntity';
 import { UserEntity } from '@/common/entities/UserEntity';
 import { QuestSessionEndReason } from '@/common/enums/QuestSessionEndReason';
-import {
-    QuestSessionDto,
-    JoinSessionDto,
-    QuestSessionResponseDto,
-    QuestSessionListResponseDto,
-} from './dto/quest-session.dto';
+import { ParticipantStatus } from '@/common/enums/ParticipantStatus';
+import { QuestSessionDto } from './dto/quest-session.dto';
 import { randomBytes } from 'crypto';
+import { JoinSessionDto } from "@/quest-session/dto/join-session.dto";
+import { QuestSessionResponseDto } from "@/quest-session/dto/quest-session-response.dto";
+import { QuestSessionListResponseDto } from "@/quest-session/dto/quest-session-list-response.dto";
 
 @Injectable()
 export class QuestSessionService {
@@ -116,7 +115,6 @@ export class QuestSessionService {
         });
 
         await this.sessionRepository.save(session);
-
         return this.findById(session.questSessionId);
     }
 
@@ -256,7 +254,6 @@ export class QuestSessionService {
         }
 
         session.startDate = startDate;
-
         await this.sessionRepository.save(session);
 
         return this.findById(id);
@@ -265,7 +262,7 @@ export class QuestSessionService {
     async cancelSession(id: number, organizerId: number): Promise<QuestSessionResponseDto> {
         const session = await this.sessionRepository.findOne({
             where: { questSessionId: id },
-            relations: ['quest', 'quest.organizer'],
+            relations: ['quest', 'quest.organizer', 'participants', 'participants.user'],
         });
 
         if (!session) {
@@ -291,7 +288,7 @@ export class QuestSessionService {
     async joinSession(dto: JoinSessionDto, userId: number): Promise<QuestSessionResponseDto> {
         const session = await this.sessionRepository.findOne({
             where: { inviteToken: dto.inviteToken },
-            relations: ['participants', 'quest', 'quest.organizer'],
+            relations: ['participants', 'participants.user', 'quest', 'quest.organizer'],
         });
 
         if (!session) {
@@ -331,6 +328,16 @@ export class QuestSessionService {
 
         if (existingParticipant) {
             throw new ConflictException('User is already a participant in this session');
+        }
+
+        const activeParticipantsCount = session.participants.filter(
+            p => p.participationStatus !== ParticipantStatus.REJECTED
+        ).length;
+
+        if (activeParticipantsCount >= session.quest.maxParticipantCount) {
+            throw new BadRequestException(
+                `Session is full. Maximum ${session.quest.maxParticipantCount} participants allowed`
+            );
         }
 
         const participant = this.participantRepository.create({
@@ -385,6 +392,8 @@ export class QuestSessionService {
                 userId: p.user.userId,
                 userName: p.user.name,
                 joinedAt: p.createdAt,
+                participationStatus: p.participationStatus,
+                rejectionReason: p.rejectionReason,
             })),
             isActive: this.isSessionActive(session),
             participantCount: session.participants?.length || 0,
