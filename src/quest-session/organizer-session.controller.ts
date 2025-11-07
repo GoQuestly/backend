@@ -14,12 +14,10 @@ import { ApiTags, ApiBearerAuth, ApiExtraModels } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@/auth/jwt-auth.guard';
 import { GetUser } from '@/auth/decorators/get-user.decorator';
 import { QuestSessionService } from './quest-session.service';
-import {
-    QuestSessionDto,
-    QuestSessionResponseDto,
-    GetQuestSessionsQueryDto,
-    PaginatedQuestSessionsResponseDto,
-} from './dto/quest-session.dto';
+import { QuestSessionDto } from './dto/quest-session.dto';
+import { GetQuestSessionsQueryDto } from "@/quest-session/dto/get-quest-sessions-query.dto";
+import { QuestSessionResponseDto } from "@/quest-session/dto/quest-session-response.dto";
+import { PaginatedQuestSessionsResponseDto } from "@/quest-session/dto/paginated-quest-sessions-response.dto";
 
 @ApiTags('Organizer - Quest Sessions')
 @ApiBearerAuth()
@@ -27,7 +25,9 @@ import {
 @Controller('organizer')
 @UseGuards(JwtAuthGuard)
 export class OrganizerSessionController {
-    constructor(private readonly sessionService: QuestSessionService) {}
+    constructor(
+        private readonly sessionService: QuestSessionService,
+    ) {}
 
     @Post('quest/:questId/sessions')
     async create(

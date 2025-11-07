@@ -1,9 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, ManyToOne, OneToMany, CreateDateColumn, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, CreateDateColumn, JoinColumn } from 'typeorm';
 import { UserEntity } from './UserEntity';
 import { QuestSessionEntity } from './QuestSessionEntity';
 import { ParticipantLocationEntity } from './ParticipantLocationEntity';
 import { ParticipantTaskEntity } from './ParticipantTaskEntity';
 import { ParticipantPointEntity } from './ParticipantPointEntity';
+import { ParticipantStatus } from '@/common/enums/ParticipantStatus';
+import { RejectionReason } from '@/common/enums/RejectionReason';
 
 @Entity('participants')
 export class ParticipantEntity {
@@ -29,4 +31,20 @@ export class ParticipantEntity {
 
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
+
+    @Column({
+        name: 'participation_status',
+        type: 'enum',
+        enum: ParticipantStatus,
+        default: ParticipantStatus.PENDING
+    })
+    participationStatus: ParticipantStatus;
+
+    @Column({
+        name: 'rejection_reason',
+        type: 'enum',
+        enum: RejectionReason,
+        nullable: true
+    })
+    rejectionReason: RejectionReason;
 }
