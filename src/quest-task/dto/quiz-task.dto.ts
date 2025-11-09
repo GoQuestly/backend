@@ -1,17 +1,8 @@
-import {
-    IsInt,
-    IsString,
-    IsBoolean,
-    ValidateNested,
-    Min,
-    IsArray,
-    IsNotEmpty,
-    Max
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { ApiProperty } from '@nestjs/swagger';
-import { QuestTaskType } from '@/common/enums/QuestTaskType';
-import { MAX_TASK_DURATION_SECONDS } from "@/quest-task/quest-task.constants";
+import {ArrayMinSize, IsArray, IsBoolean, IsInt, IsNotEmpty, IsString, Max, Min, ValidateNested} from 'class-validator';
+import {Type} from 'class-transformer';
+import {ApiProperty} from '@nestjs/swagger';
+import {QuestTaskType} from '@/common/enums/QuestTaskType';
+import {MAX_TASK_DURATION_SECONDS} from "@/quest-task/quest-task.constants";
 
 export class QuizAnswerDto {
     @ApiProperty({ example: 'London' })
@@ -32,17 +23,17 @@ export class QuizQuestionDto {
 
     @ApiProperty({ example: 1 })
     @IsInt()
-    @Min(0)
+    @Min(1)
     orderNumber: number;
 
     @ApiProperty({ example: 10 })
     @IsInt()
     @Min(0)
-    @Max(100)
     scorePointsCount: number;
 
     @ApiProperty({ type: [QuizAnswerDto] })
     @IsArray()
+    @ArrayMinSize(2)
     @ValidateNested({ each: true })
     @Type(() => QuizAnswerDto)
     answers: QuizAnswerDto[];
@@ -63,12 +54,6 @@ export class BaseQuizTaskDto {
     @ApiProperty({ example: true })
     @IsBoolean()
     isRequiredForNextPoint?: boolean;
-
-    @ApiProperty({ example: 100, description: 'Maximum score points for the quiz task' })
-    @IsInt()
-    @Min(0)
-    @Max(100)
-    maxScorePointsCount?: number;
 
     @ApiProperty({ example: 50 })
     @IsInt()
