@@ -1,23 +1,29 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { QuestTaskEntity } from '@/common/entities/QuestTaskEntity';
-import { QuizQuestionEntity } from '@/common/entities/QuizQuestionEntity';
-import { QuizAnswerEntity } from '@/common/entities/QuizAnswerEntity';
-import { QuestPointEntity } from '@/common/entities/QuestPointEntity';
-import { QuestTaskType } from '@/common/enums/QuestTaskType';
 import {
-    CreateQuizTaskDto,
-    UpdateQuizTaskDto,
-    QuizQuestionDto,
-    CreateCodeWordTaskDto,
-    UpdateCodeWordTaskDto,
-    CreatePhotoTaskDto,
-    UpdatePhotoTaskDto,
-    QuestTaskResponseDto,
-    QuizTaskResponseDto,
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+    Injectable,
+    NotFoundException
+} from '@nestjs/common';
+import {InjectRepository} from '@nestjs/typeorm';
+import {Repository} from 'typeorm';
+import {QuestTaskEntity} from '@/common/entities/QuestTaskEntity';
+import {QuizQuestionEntity} from '@/common/entities/QuizQuestionEntity';
+import {QuizAnswerEntity} from '@/common/entities/QuizAnswerEntity';
+import {QuestPointEntity} from '@/common/entities/QuestPointEntity';
+import {QuestTaskType} from '@/common/enums/QuestTaskType';
+import {
     CodeWordTaskResponseDto,
-    PhotoTaskResponseDto
+    CreateCodeWordTaskDto,
+    CreatePhotoTaskDto,
+    CreateQuizTaskDto,
+    PhotoTaskResponseDto,
+    QuestTaskResponseDto,
+    QuizQuestionDto,
+    QuizTaskResponseDto,
+    UpdateCodeWordTaskDto,
+    UpdatePhotoTaskDto,
+    UpdateQuizTaskDto
 } from './dto';
 
 @Injectable()
@@ -57,12 +63,16 @@ export class QuestTaskService {
     async createQuizTask(dto: CreateQuizTaskDto, questPointId: number, organizerId: number): Promise<QuizTaskResponseDto> {
         const questPoint = await this.validateQuestPointHasNoTask(questPointId, organizerId);
 
+        this.validateQuizQuestions(dto.quizQuestions);
+
+        const maxScorePointsCount = dto.quizQuestions.reduce((sum, q) => sum + q.scorePointsCount, 0);
+
         const questTask = this.questTaskRepository.create({
             taskType: QuestTaskType.QUIZ,
             description: dto.description,
-            maxScorePointsCount: dto.maxScorePointsCount,
+            maxScorePointsCount,
             maxDurationSeconds: dto.maxDurationSeconds,
-            isRequiredForNextPoint: dto.isRequiredForNextPoint,
+            isRequiredForNextPoint: dto.isRequiredForNextPoint ?? true,
             point: questPoint,
             codeWord: '',
             successScorePointsPercent: dto.successScorePointsPercent,
@@ -82,7 +92,7 @@ export class QuestTaskService {
             description: dto.description,
             maxScorePointsCount: dto.scorePointsCount,
             maxDurationSeconds: dto.maxDurationSeconds,
-            isRequiredForNextPoint: dto.isRequiredForNextPoint,
+            isRequiredForNextPoint: dto.isRequiredForNextPoint ?? true,
             point: questPoint,
             codeWord: dto.codeWord,
             successScorePointsPercent: 100,
@@ -99,13 +109,51 @@ export class QuestTaskService {
             description: dto.description,
             maxScorePointsCount: dto.scorePointsCount,
             maxDurationSeconds: dto.maxDurationSeconds,
-            isRequiredForNextPoint: dto.isRequiredForNextPoint,
+            isRequiredForNextPoint: dto.isRequiredForNextPoint ?? true,
             point: questPoint,
             codeWord: '',
             successScorePointsPercent: 100,
         });
 
         return this.findById(questTask.questTaskId, organizerId) as Promise<PhotoTaskResponseDto>;
+    }
+
+    async updateQuizTask(id: number, dto: UpdateQuizTaskDto, organizerId: number): Promise<QuizTaskResponseDto> {
+        const task = await this.questTaskRepository.findOne({
+            where: { questTaskId: id },
+            relations: ['quizQuestions', 'quizQuestions.answers', 'point', 'point.quest', 'point.quest.organizer'],
+        });
+
+        if (!task) {
+            throw new NotFoundException(`Quest task with ID ${id} not found`);
+        }
+
+        if (task.point.quest.organizer.userId !== organizerId) {
+            throw new ForbiddenException('Only the quest organizer can update quest tasks');
+        }
+
+        if (task.taskType !== QuestTaskType.QUIZ) {
+            throw new BadRequestException('Task is not a quiz task');
+        }
+
+        this.validateQuizQuestions(dto.quizQuestions);
+
+        const maxScorePointsCount = dto.quizQuestions.reduce((sum, q) => sum + q.scorePointsCount, 0);
+
+        Object.assign(task, {
+            description: dto.description,
+            maxScorePointsCount,
+            maxDurationSeconds: dto.maxDurationSeconds,
+            isRequiredForNextPoint: dto.isRequiredForNextPoint ?? true,
+            successScorePointsPercent: dto.successScorePointsPercent,
+        });
+
+        await this.questTaskRepository.save(task);
+
+        await this.quizQuestionRepository.delete({ task: { questTaskId: id } });
+        await this.createQuizQuestions(task, dto.quizQuestions);
+
+        return this.findById(id, organizerId) as Promise<QuizTaskResponseDto>;
     }
 
     private async createQuizQuestions(task: QuestTaskEntity, questions: QuizQuestionDto[]): Promise<void> {
@@ -148,40 +196,6 @@ export class QuestTaskService {
         return this.mapToResponseDto(task);
     }
 
-    async updateQuizTask(id: number, dto: UpdateQuizTaskDto, organizerId: number): Promise<QuizTaskResponseDto> {
-        const task = await this.questTaskRepository.findOne({
-            where: { questTaskId: id },
-            relations: ['quizQuestions', 'quizQuestions.answers', 'point', 'point.quest', 'point.quest.organizer'],
-        });
-
-        if (!task) {
-            throw new NotFoundException(`Quest task with ID ${id} not found`);
-        }
-
-        if (task.point.quest.organizer.userId !== organizerId) {
-            throw new ForbiddenException('Only the quest organizer can update quest tasks');
-        }
-
-        if (task.taskType !== QuestTaskType.QUIZ) {
-            throw new BadRequestException('Task is not a quiz task');
-        }
-
-        Object.assign(task, {
-            description: dto.description,
-            maxScorePointsCount: dto.maxScorePointsCount,
-            maxDurationSeconds: dto.maxDurationSeconds,
-            isRequiredForNextPoint: dto.isRequiredForNextPoint,
-            successScorePointsPercent: dto.successScorePointsPercent,
-        });
-
-        await this.questTaskRepository.save(task);
-
-        await this.quizQuestionRepository.delete({ task: { questTaskId: id } });
-        await this.createQuizQuestions(task, dto.quizQuestions);
-
-        return this.findById(id, organizerId) as Promise<QuizTaskResponseDto>;
-    }
-
     async updateCodeWordTask(id: number, dto: UpdateCodeWordTaskDto, organizerId: number): Promise<CodeWordTaskResponseDto> {
         const task = await this.questTaskRepository.findOne({
             where: { questTaskId: id },
@@ -204,7 +218,7 @@ export class QuestTaskService {
             description: dto.description,
             maxScorePointsCount: dto.scorePointsCount,
             maxDurationSeconds: dto.maxDurationSeconds,
-            isRequiredForNextPoint: dto.isRequiredForNextPoint,
+            isRequiredForNextPoint: dto.isRequiredForNextPoint ?? true,
             codeWord: dto.codeWord,
         });
 
@@ -235,12 +249,32 @@ export class QuestTaskService {
             description: dto.description,
             maxScorePointsCount: dto.scorePointsCount,
             maxDurationSeconds: dto.maxDurationSeconds,
-            isRequiredForNextPoint: dto.isRequiredForNextPoint,
+            isRequiredForNextPoint: dto.isRequiredForNextPoint ?? true,
         });
 
         await this.questTaskRepository.save(task);
 
         return this.findById(id, organizerId) as Promise<PhotoTaskResponseDto>;
+    }
+
+    private validateQuizQuestions(questions: QuizQuestionDto[]): void {
+        const orderNumbers = new Set<number>();
+
+        for (const questionDto of questions) {
+            if (orderNumbers.has(questionDto.orderNumber)) {
+                throw new BadRequestException(`Questions must have different order numbers. Duplicate orderNumber: ${questionDto.orderNumber}`);
+            }
+            orderNumbers.add(questionDto.orderNumber);
+
+            if (questionDto.answers.length < 2) {
+                throw new BadRequestException(`Question "${questionDto.question}" must have at least 2 answers`);
+            }
+
+            const hasCorrectAnswer = questionDto.answers.some(a => a.isCorrect === true);
+            if (!hasCorrectAnswer) {
+                throw new BadRequestException(`Question "${questionDto.question}" must have at least one correct answer`);
+            }
+        }
     }
 
     async delete(id: number, organizerId: number): Promise<void> {
