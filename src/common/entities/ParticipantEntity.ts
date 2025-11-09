@@ -1,19 +1,23 @@
-import { Entity, PrimaryGeneratedColumn, ManyToOne, OneToMany } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, CreateDateColumn, JoinColumn } from 'typeorm';
 import { UserEntity } from './UserEntity';
 import { QuestSessionEntity } from './QuestSessionEntity';
 import { ParticipantLocationEntity } from './ParticipantLocationEntity';
 import { ParticipantTaskEntity } from './ParticipantTaskEntity';
 import { ParticipantPointEntity } from './ParticipantPointEntity';
+import { ParticipantStatus } from '@/common/enums/ParticipantStatus';
+import { RejectionReason } from '@/common/enums/RejectionReason';
 
 @Entity('participants')
 export class ParticipantEntity {
     @PrimaryGeneratedColumn({ name: "participant_id" })
     participantId: number;
 
-    @ManyToOne(() => UserEntity, (user) => user.participations)
+    @ManyToOne(() => UserEntity, (user) => user.participations, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'user_user_id' })
     user: UserEntity;
 
-    @ManyToOne(() => QuestSessionEntity, (session) => session.participants)
+    @ManyToOne(() => QuestSessionEntity, (session) => session.participants, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'session_quest_session_id' })
     session: QuestSessionEntity;
 
     @OneToMany(() => ParticipantLocationEntity, (loc) => loc.participant)
@@ -24,4 +28,23 @@ export class ParticipantEntity {
 
     @OneToMany(() => ParticipantPointEntity, (pp) => pp.participant)
     points: ParticipantPointEntity[];
+
+    @CreateDateColumn({ name: 'created_at' })
+    createdAt: Date;
+
+    @Column({
+        name: 'participation_status',
+        type: 'enum',
+        enum: ParticipantStatus,
+        default: ParticipantStatus.PENDING
+    })
+    participationStatus: ParticipantStatus;
+
+    @Column({
+        name: 'rejection_reason',
+        type: 'enum',
+        enum: RejectionReason,
+        nullable: true
+    })
+    rejectionReason: RejectionReason;
 }

@@ -23,7 +23,6 @@ RUN npm install ts-node tsconfig-paths typescript dotenv --save-dev
 COPY --from=builder /usr/src/app/dist ./dist
 COPY --from=builder /usr/src/app/tsconfig.json ./
 COPY --from=builder /usr/src/app/src ./src
-COPY --from=builder /usr/src/app/.env ./.env
 COPY --from=builder /usr/src/app/node_modules/ts-node ./node_modules/ts-node
 COPY --from=builder /usr/src/app/node_modules/tsconfig-paths ./node_modules/tsconfig-paths
 COPY --from=builder /usr/src/app/node_modules/cross-env ./node_modules/cross-env

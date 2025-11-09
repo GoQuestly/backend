@@ -16,7 +16,7 @@ export class QuizQuestionEntity {
     @Column({ name: "score_points_count" })
     scorePointsCount: number;
 
-    @ManyToOne(() => QuestTaskEntity, (task) => task.quizQuestions)
+    @ManyToOne(() => QuestTaskEntity, (task) => task.quizQuestions, { onDelete: 'CASCADE' })
     task: QuestTaskEntity;
 
     @OneToMany(() => QuizAnswerEntity, (a) => a.question)
