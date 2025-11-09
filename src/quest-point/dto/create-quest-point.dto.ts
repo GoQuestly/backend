@@ -1,4 +1,4 @@
-import {IsString, IsNumber, IsNotEmpty, Min, Max} from 'class-validator';
+import {IsNotEmpty, IsNumber, IsString, Max, Min} from 'class-validator';
 import {ApiProperty} from '@nestjs/swagger';
 
 export class CreateQuestPointDto {
@@ -21,5 +21,6 @@ export class CreateQuestPointDto {
 
     @ApiProperty({example: 1})
     @IsNumber()
+    @Min(1)
     orderNum: number;
 }
