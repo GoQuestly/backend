@@ -11,12 +11,11 @@ import { ParticipantLocationEntity } from '@/common/entities/ParticipantLocation
 import { ParticipantEntity } from '@/common/entities/ParticipantEntity';
 import { QuestSessionEntity } from '@/common/entities/QuestSessionEntity';
 import { ParticipantStatus } from '@/common/enums/ParticipantStatus';
-import { RejectionReason, RejectionReasonMessages } from '@/common/enums/RejectionReason';
+import { RejectionReason } from '@/common/enums/RejectionReason';
 import { UpdateLocationDto } from "@/quest-session/dto/update-location.dto";
 import { ParticipantLocationDto } from "@/quest-session/dto/participant-location.dto";
 import { LocationHistoryResponseDto } from "@/quest-session/dto/location-history-response.dto";
 import { ParticipantRouteDto } from "@/quest-session/dto/participant-route.dto";
-import { PRE_SESSION_GRACE_PERIOD_MS } from './quest-session.constants';
 
 @Injectable()
 export class LocationService {
@@ -47,14 +46,6 @@ export class LocationService {
             throw new BadRequestException('Cannot update location for ended session');
         }
 
-        const now = new Date();
-        const sessionStart = new Date(session.startDate);
-        const gracePeriodStart = new Date(sessionStart.getTime() - PRE_SESSION_GRACE_PERIOD_MS);
-
-        if (now < gracePeriodStart) {
-            throw new BadRequestException('Location updates are allowed starting 15 minutes before session start');
-        }
-
         const participant = await this.participantRepository.findOne({
             where: {
                 session: { questSessionId: sessionId },
@@ -67,6 +58,14 @@ export class LocationService {
             throw new ForbiddenException('You are not a participant in this session');
         }
 
+        const existingLocationCount = await this.locationRepository.count({
+            where: {
+                participant: { participantId: participant.participantId }
+            }
+        });
+
+        const isFirstLocation = existingLocationCount === 0;
+
         const location = this.locationRepository.create({
             participant,
             latitude: dto.latitude,
@@ -75,6 +74,25 @@ export class LocationService {
         });
 
         const savedLocation = await this.locationRepository.save(location);
+
+        if (isFirstLocation && participant.participationStatus === ParticipantStatus.PENDING) {
+            const distance = this.calculateDistance(
+                session.quest.startingLatitude,
+                session.quest.startingLongitude,
+                dto.latitude,
+                dto.longitude
+            );
+
+            if (distance > session.quest.startingRadiusMeters) {
+                participant.participationStatus = ParticipantStatus.REJECTED;
+                participant.rejectionReason = RejectionReason.TOO_FAR_FROM_START;
+            } else {
+                participant.participationStatus = ParticipantStatus.APPROVED;
+                participant.rejectionReason = null;
+            }
+
+            await this.participantRepository.save(participant);
+        }
 
         return this.mapToDto(savedLocation, participant);
     }
@@ -180,17 +198,7 @@ export class LocationService {
         return latestLocations;
     }
 
-    async validateStartPositions(sessionId: number): Promise<{
-        approved: number;
-        rejected: number;
-        details: Array<{
-            participantId: number;
-            userId: number;
-            userName: string;
-            status: ParticipantStatus;
-            reason?: string;
-        }>;
-    }> {
+    async rejectParticipantsWithoutLocation(sessionId: number) {
         const session = await this.sessionRepository.findOne({
             where: { questSessionId: sessionId },
             relations: ['quest', 'participants', 'participants.user'],
@@ -200,95 +208,23 @@ export class LocationService {
             throw new NotFoundException(`Session with ID ${sessionId} not found`);
         }
 
-        const results = {
-            approved: 0,
-            rejected: 0,
-            details: [],
-        };
-
         for (const participant of session.participants) {
             if (participant.participationStatus !== ParticipantStatus.PENDING) {
                 continue;
             }
 
-            const latestLocation = await this.locationRepository.findOne({
+            const hasLocation = await this.locationRepository.exists({
                 where: {
                     participant: { participantId: participant.participantId }
-                },
-                order: {
-                    timestamp: 'DESC'
                 }
             });
 
-            if (!latestLocation) {
+            if (!hasLocation) {
                 participant.participationStatus = ParticipantStatus.REJECTED;
                 participant.rejectionReason = RejectionReason.NO_LOCATION;
                 await this.participantRepository.save(participant);
-
-                results.rejected++;
-                results.details.push({
-                    participantId: participant.participantId,
-                    userId: participant.user.userId,
-                    userName: participant.user.name,
-                    status: ParticipantStatus.REJECTED,
-                    reason: RejectionReasonMessages[RejectionReason.NO_LOCATION],
-                });
-                continue;
-            }
-
-            const locationAge = Date.now() - latestLocation.timestamp.getTime();
-
-            if (locationAge > PRE_SESSION_GRACE_PERIOD_MS) {
-                participant.participationStatus = ParticipantStatus.REJECTED;
-                participant.rejectionReason = RejectionReason.LOCATION_TOO_OLD;
-                await this.participantRepository.save(participant);
-
-                results.rejected++;
-                results.details.push({
-                    participantId: participant.participantId,
-                    userId: participant.user.userId,
-                    userName: participant.user.name,
-                    status: ParticipantStatus.REJECTED,
-                    reason: RejectionReasonMessages[RejectionReason.LOCATION_TOO_OLD],
-                });
-                continue;
-            }
-
-            const distance = this.calculateDistance(
-                session.quest.startingLatitude,
-                session.quest.startingLongitude,
-                latestLocation.latitude,
-                latestLocation.longitude
-            );
-
-            if (distance > session.quest.startingRadiusMeters) {
-                participant.participationStatus = ParticipantStatus.REJECTED;
-                participant.rejectionReason = RejectionReason.TOO_FAR_FROM_START;
-                await this.participantRepository.save(participant);
-
-                results.rejected++;
-                results.details.push({
-                    participantId: participant.participantId,
-                    userId: participant.user.userId,
-                    userName: participant.user.name,
-                    status: ParticipantStatus.REJECTED,
-                    reason: `${RejectionReasonMessages[RejectionReason.TOO_FAR_FROM_START]}: ${Math.round(distance)}m`,
-                });
-            } else {
-                participant.participationStatus = ParticipantStatus.APPROVED;
-                await this.participantRepository.save(participant);
-
-                results.approved++;
-                results.details.push({
-                    participantId: participant.participantId,
-                    userId: participant.user.userId,
-                    userName: participant.user.name,
-                    status: ParticipantStatus.APPROVED,
-                });
             }
         }
-
-        return results;
     }
 
     private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {

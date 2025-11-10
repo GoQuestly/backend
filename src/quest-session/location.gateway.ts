@@ -13,12 +13,19 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { QuestSessionEntity } from '@/common/entities/QuestSessionEntity';
+import { ParticipantStatus } from '@/common/enums/ParticipantStatus';
 import { UpdateLocationDto } from "@/quest-session/dto/update-location.dto";
-import { PRE_SESSION_GRACE_PERIOD_MS } from './quest-session.constants';
+import { ParticipantEntity } from '@/common/entities/ParticipantEntity';
+import { UserEntity } from '@/common/entities/UserEntity';
 
 interface AuthenticatedSocket extends Socket {
     userId?: number;
     sessionId?: number;
+}
+
+interface ErrorResponse {
+    success: false;
+    error: string;
 }
 
 @WebSocketGateway({
@@ -71,18 +78,209 @@ export class LocationGateway implements OnGatewayConnection, OnGatewayDisconnect
         }
     }
 
-    handleDisconnect(client: AuthenticatedSocket) {
+    async handleDisconnect(client: AuthenticatedSocket) {
         console.log(`Client disconnected: ${client.id}`);
 
-        if (client.sessionId) {
-            const participants = this.sessionParticipants.get(client.sessionId);
-            if (participants) {
-                participants.delete(client.id);
-                if (participants.size === 0) {
-                    this.sessionParticipants.delete(client.sessionId);
+        if (client.sessionId && client.userId) {
+            const sessionId = client.sessionId;
+
+            try {
+                const session = await this.getSessionWithRelations(sessionId);
+
+                if (session) {
+                    const isOrganizer = this.isOrganizer(session, client.userId);
+                    const currentUser = this.getCurrentUser(session, client.userId, isOrganizer);
+
+                    if (currentUser && !isOrganizer) {
+                        this.notifyUserLeft(sessionId, currentUser);
+                    }
                 }
+            } catch (error) {
+                console.error(`[handleDisconnect] Error notifying organizer:`, error.message);
             }
+
+            this.removeParticipantFromTracking(sessionId, client.id);
         }
+    }
+
+    @SubscribeMessage('join-session')
+    async handleJoinSession(
+        @ConnectedSocket() client: AuthenticatedSocket,
+        @MessageBody() data: { sessionId: number }
+    ) {
+        try {
+            const { sessionId } = data;
+
+            console.log(`[join-session] User ${client.userId} attempting to join session ${sessionId}`);
+
+            const session = await this.getSessionWithRelations(sessionId);
+
+            if (!session) {
+                return this.emitError(client, 'join-session-error', 'Session not found',
+                    `[join-session] Session ${sessionId} not found`);
+            }
+
+            const isOrganizer = this.isOrganizer(session, client.userId);
+            const participant = this.getParticipant(session, client.userId);
+            const isParticipant = !!participant;
+
+            if (!isOrganizer && !isParticipant) {
+                return this.emitError(client, 'join-session-error', 'You do not have access to this session',
+                    `[join-session] User ${client.userId} has no access to session ${sessionId}`);
+            }
+
+            if (!isOrganizer && participant && participant.participationStatus === ParticipantStatus.REJECTED) {
+                return this.emitError(client, 'join-session-error', 'You have been rejected from this session',
+                    `[join-session] User ${client.userId} has been rejected from session ${sessionId}`);
+            }
+
+            if (!this.isSessionActive(session)) {
+                return this.emitError(client, 'join-session-error', 'Session is not active',
+                    `[join-session] Session ${sessionId} is not active`);
+            }
+
+            if (client.sessionId === sessionId) {
+                return this.emitError(client, 'join-session-error', 'You are already connected to this session',
+                    `[join-session] User ${client.userId} already joined session ${sessionId}`);
+            }
+
+            client.sessionId = sessionId;
+            client.join(`session-${sessionId}`);
+
+            this.addParticipantToTracking(sessionId, client.id);
+
+            console.log(`[join-session] User ${client.userId} successfully joined session ${sessionId}`);
+
+            const currentUser = this.getCurrentUser(session, client.userId, isOrganizer);
+
+            if (currentUser && !isOrganizer) {
+                this.notifyUserJoined(sessionId, currentUser);
+            }
+
+            return {
+                success: true,
+                message: 'Joined session',
+            };
+        } catch (error) {
+            console.error(`[join-session] Error:`, error);
+            const errorResponse: ErrorResponse = { success: false, error: error.message || 'Unknown error occurred' };
+            client.emit('join-session-error', errorResponse);
+            return errorResponse;
+        }
+    }
+
+    @SubscribeMessage('leave-session')
+    async handleLeaveSession(
+        @ConnectedSocket() client: AuthenticatedSocket,
+        @MessageBody() data: { sessionId: number }
+    ) {
+        try {
+            const { sessionId } = data;
+            console.log(`[leave-session] User ${client.userId} leaving session ${sessionId}`);
+
+            const session = await this.getSessionWithRelations(sessionId);
+
+            if (!session) {
+                return this.emitError(client, 'leave-session-error', 'Session not found',
+                    `[leave-session] Session ${sessionId} not found`);
+            }
+
+            const isOrganizer = this.isOrganizer(session, client.userId);
+            const isParticipant = session.participants.some(p => p.user.userId === client.userId);
+
+            if (!isOrganizer && !isParticipant) {
+                return this.emitError(client, 'leave-session-error', 'You are not a participant or organizer of this session',
+                    `[leave-session] User ${client.userId} is not a participant or organizer of session ${sessionId}`);
+            }
+
+            const currentUser = this.getCurrentUser(session, client.userId, isOrganizer);
+
+            client.leave(`session-${sessionId}`);
+            client.sessionId = undefined;
+
+            this.removeParticipantFromTracking(sessionId, client.id);
+
+            if (currentUser && !isOrganizer) {
+                this.notifyUserLeft(sessionId, currentUser);
+            }
+
+            return { success: true, message: 'Left session', sessionId };
+        } catch (error) {
+            console.error(`[leave-session] Error:`, error);
+            const errorResponse: ErrorResponse = { success: false, error: error.message || 'Unknown error occurred' };
+            client.emit('leave-session-error', errorResponse);
+            return errorResponse;
+        }
+    }
+
+    @SubscribeMessage('update-location')
+    async handleLocationUpdate(
+        @ConnectedSocket() client: AuthenticatedSocket,
+        @MessageBody() data: { sessionId: number; latitude: number; longitude: number }
+    ) {
+        try {
+            const { sessionId, latitude, longitude } = data;
+
+            if (client.sessionId !== sessionId) {
+                return this.emitError(client, 'update-location-error', 'You are not connected to this session',
+                    `[update-location] User ${client.userId} not connected to session ${sessionId}`);
+            }
+
+            const session = await this.getSessionWithRelations(sessionId);
+
+            if (!session) {
+                return this.emitError(client, 'update-location-error', 'Session not found',
+                    `[update-location] Session ${sessionId} not found`);
+            }
+
+            const participant = this.getParticipant(session, client.userId);
+            if (participant && participant.participationStatus === ParticipantStatus.REJECTED) {
+                return this.emitError(client, 'update-location-error', 'You have been rejected from this session',
+                    `[update-location] User ${client.userId} has been rejected from session ${sessionId}`);
+            }
+
+            const coordinatesError = this.validateCoordinates(latitude, longitude);
+            if (coordinatesError) {
+                return this.emitError(client, 'update-location-error', coordinatesError);
+            }
+
+            const locationDto: UpdateLocationDto = { latitude, longitude };
+
+            const location = await this.locationService.updateLocation(
+                sessionId,
+                client.userId,
+                locationDto
+            );
+
+            await this.notifyOrganizerLocationUpdate(sessionId, session.quest.organizer.userId, location);
+
+            return { success: true, location };
+        } catch (error) {
+            console.error(`[update-location] Error:`, error.message);
+            const errorResponse: ErrorResponse = { success: false, error: error.message || 'Failed to update location' };
+            client.emit('update-location-error', errorResponse);
+            return errorResponse;
+        }
+    }
+
+    private async getSessionWithRelations(sessionId: number): Promise<QuestSessionEntity | null> {
+        return this.sessionRepository.findOne({
+            where: { questSessionId: sessionId },
+            relations: ['quest', 'quest.organizer', 'participants', 'participants.user'],
+        });
+    }
+
+    private isOrganizer(session: QuestSessionEntity, userId: number): boolean {
+        return session.quest.organizer.userId === userId;
+    }
+
+    private getParticipant(session: QuestSessionEntity, userId: number): ParticipantEntity | undefined {
+        return session.participants.find(p => p.user.userId === userId);
+    }
+
+    private getCurrentUser(session: QuestSessionEntity, userId: number, isOrganizer: boolean): UserEntity | null {
+        const participant = this.getParticipant(session, userId);
+        return participant?.user || (isOrganizer ? session.quest.organizer : null);
     }
 
     private isSessionActive(session: QuestSessionEntity): boolean {
@@ -92,8 +290,7 @@ export class LocationGateway implements OnGatewayConnection, OnGatewayDisconnect
             return false;
         }
 
-        const gracePeriodStart = new Date(session.startDate.getTime() - PRE_SESSION_GRACE_PERIOD_MS);
-        if (now < gracePeriodStart) {
+        if (now < session.startDate) {
             return false;
         }
 
@@ -107,109 +304,77 @@ export class LocationGateway implements OnGatewayConnection, OnGatewayDisconnect
         return now < maxEndTime;
     }
 
-    @SubscribeMessage('join-session')
-    async handleJoinSession(
-        @ConnectedSocket() client: AuthenticatedSocket,
-        @MessageBody() data: { sessionId: number }
-    ) {
-        try {
-            const { sessionId } = data;
+    private emitError(
+        client: AuthenticatedSocket,
+        event: string,
+        errorMessage: string,
+        logMessage?: string
+    ): ErrorResponse {
+        if (logMessage) {
+            console.error(logMessage);
+        }
+        const errorResponse: ErrorResponse = { success: false, error: errorMessage };
+        client.emit(event, errorResponse);
+        return errorResponse;
+    }
 
-            console.log(`[join-session] User ${client.userId} attempting to join session ${sessionId}`);
+    private notifyUserJoined(sessionId: number, user: UserEntity): void {
+        this.server.to(`session-${sessionId}`).emit('user-joined', {
+            userId: user.userId,
+            userName: user.name,
+            sessionId: sessionId,
+        });
+    }
 
-            const session = await this.sessionRepository.findOne({
-                where: { questSessionId: sessionId },
-                relations: ['quest', 'quest.organizer', 'participants', 'participants.user'],
-            });
+    private notifyUserLeft(sessionId: number, user: UserEntity): void {
+        this.server.to(`session-${sessionId}`).emit('user-left', {
+            userId: user.userId,
+            userName: user.name,
+            sessionId: sessionId,
+        });
+    }
 
-            if (!session) {
-                console.error(`[join-session] Session ${sessionId} not found`);
-                const errorResponse = { success: false, error: 'Session not found' };
-                client.emit('join-session-error', errorResponse);
-                return errorResponse;
+    private async notifyOrganizerLocationUpdate(sessionId: number, organizerUserId: number, location: any): Promise<void> {
+        const organizerSockets = await this.server.in(`session-${sessionId}`).fetchSockets();
+
+        for (const socket of organizerSockets) {
+            const authSocket = socket as unknown as AuthenticatedSocket;
+            if (authSocket.userId === organizerUserId) {
+                socket.emit('location-updated', location);
             }
-
-            const isOrganizer = session.quest.organizer.userId === client.userId;
-            const isParticipant = session.participants.some(p => p.user.userId === client.userId);
-
-            if (!isOrganizer && !isParticipant) {
-                console.error(`[join-session] User ${client.userId} has no access to session ${sessionId}`);
-                const errorResponse = { success: false, error: 'You do not have access to this session' };
-                client.emit('join-session-error', errorResponse);
-                return errorResponse;
-            }
-
-            if (!this.isSessionActive(session)) {
-                console.error(`[join-session] Session ${sessionId} is not active`);
-                const errorResponse = { success: false, error: 'Session is not active' };
-                client.emit('join-session-error', errorResponse);
-                return errorResponse;
-            }
-
-            client.sessionId = sessionId;
-            client.join(`session-${sessionId}`);
-
-            if (!this.sessionParticipants.has(sessionId)) {
-                this.sessionParticipants.set(sessionId, new Set());
-            }
-            this.sessionParticipants.get(sessionId).add(client.id);
-
-            console.log(`[join-session] User ${client.userId} successfully joined session ${sessionId}`);
-
-            return {
-                success: true,
-                message: 'Joined session',
-            };
-        } catch (error) {
-            console.error(`[join-session] Error:`, error);
-            const errorResponse = { success: false, error: error.message || 'Unknown error occurred' };
-            client.emit('join-session-error', errorResponse);
-            return errorResponse;
         }
     }
 
-    @SubscribeMessage('leave-session')
-    async handleLeaveSession(
-        @ConnectedSocket() client: AuthenticatedSocket,
-        @MessageBody() data: { sessionId: number }
-    ) {
-        const { sessionId } = data;
-        console.log(`[leave-session] User ${client.userId} leaving session ${sessionId}`);
+    private validateCoordinates(latitude: number, longitude: number): string | null {
+        if (latitude < -90 || latitude > 90) {
+            return latitude > 90
+                ? 'Latitude cannot be greater than 90'
+                : 'Latitude cannot be less than -90';
+        }
 
-        client.leave(`session-${sessionId}`);
+        if (longitude < -180 || longitude > 180) {
+            return longitude > 180
+                ? 'Longitude cannot be greater than 180'
+                : 'Longitude cannot be less than -180';
+        }
 
+        return null;
+    }
+
+    private addParticipantToTracking(sessionId: number, clientId: string): void {
+        if (!this.sessionParticipants.has(sessionId)) {
+            this.sessionParticipants.set(sessionId, new Set());
+        }
+        this.sessionParticipants.get(sessionId).add(clientId);
+    }
+
+    private removeParticipantFromTracking(sessionId: number, clientId: string): void {
         const participants = this.sessionParticipants.get(sessionId);
         if (participants) {
-            participants.delete(client.id);
-        }
-
-        return { success: true, message: 'Left session', sessionId };
-    }
-
-    @SubscribeMessage('update-location')
-    async handleLocationUpdate(
-        @ConnectedSocket() client: AuthenticatedSocket,
-        @MessageBody() data: { sessionId: number; latitude: number; longitude: number }
-    ) {
-        try {
-            const { sessionId, latitude, longitude } = data;
-
-            const locationDto: UpdateLocationDto = { latitude, longitude };
-
-            const location = await this.locationService.updateLocation(
-                sessionId,
-                client.userId,
-                locationDto
-            );
-
-            this.server.to(`session-${sessionId}`).emit('location-updated', location);
-
-            return { success: true, location };
-        } catch (error) {
-            console.error(`[update-location] Error:`, error.message);
-            const errorResponse = { success: false, error: error.message || 'Failed to update location' };
-            client.emit('update-location-error', errorResponse);
-            return errorResponse;
+            participants.delete(clientId);
+            if (participants.size === 0) {
+                this.sessionParticipants.delete(sessionId);
+            }
         }
     }
 }
