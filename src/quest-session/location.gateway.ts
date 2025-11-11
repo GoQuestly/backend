@@ -4,10 +4,8 @@ import {
     SubscribeMessage,
     ConnectedSocket,
     MessageBody,
-    OnGatewayConnection,
-    OnGatewayDisconnect,
 } from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
+import { Server } from 'socket.io';
 import { LocationService } from './location.service';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -15,18 +13,10 @@ import { Repository } from 'typeorm';
 import { QuestSessionEntity } from '@/common/entities/QuestSessionEntity';
 import { ParticipantStatus } from '@/common/enums/ParticipantStatus';
 import { UpdateLocationDto } from "@/quest-session/dto/update-location.dto";
-import { ParticipantEntity } from '@/common/entities/ParticipantEntity';
 import { UserEntity } from '@/common/entities/UserEntity';
-
-interface AuthenticatedSocket extends Socket {
-    userId?: number;
-    sessionId?: number;
-}
-
-interface ErrorResponse {
-    success: false;
-    error: string;
-}
+import { AbstractSessionGateway } from './abstract-session.gateway';
+import { AuthenticatedSocket, ErrorResponse } from './gateway.types';
+import { forwardRef, Inject } from '@nestjs/common';
 
 @WebSocketGateway({
     cors: {
@@ -35,47 +25,21 @@ interface ErrorResponse {
     },
     namespace: '/location',
 })
-export class LocationGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class LocationGateway extends AbstractSessionGateway {
     @WebSocketServer()
     server: Server;
 
+    protected gatewayName = 'location';
     private sessionParticipants: Map<number, Set<string>> = new Map();
 
     constructor(
+        @Inject(forwardRef(() => LocationService))
         private locationService: LocationService,
-        private jwtService: JwtService,
+        protected jwtService: JwtService,
         @InjectRepository(QuestSessionEntity)
-        private sessionRepository: Repository<QuestSessionEntity>,
-    ) {}
-
-    async handleConnection(client: AuthenticatedSocket) {
-        try {
-            const token = client.handshake.auth.token || client.handshake.headers.authorization?.split(' ')[1];
-
-            if (!token) {
-                console.error(`[connection] No token provided for client ${client.id}`);
-                client.emit('error', {
-                    success: false,
-                    error: 'Authentication token is required',
-                });
-                setTimeout(() => client.disconnect(), 100);
-                return;
-            }
-
-            const payload = this.jwtService.verify(token);
-            client.userId = payload.sub;
-
-            console.log(`Client connected: ${client.id}, userId: ${client.userId}`);
-        } catch (error) {
-            console.error(`[connection] Authentication error for client ${client.id}:`, error.message);
-            client.emit('error', {
-                success: false,
-                error: error.name === 'TokenExpiredError'
-                    ? 'Authentication token has expired'
-                    : 'Invalid authentication token',
-            });
-            setTimeout(() => client.disconnect(), 100);
-        }
+        protected sessionRepository: Repository<QuestSessionEntity>,
+    ) {
+        super();
     }
 
     async handleDisconnect(client: AuthenticatedSocket) {
@@ -263,60 +227,6 @@ export class LocationGateway implements OnGatewayConnection, OnGatewayDisconnect
         }
     }
 
-    private async getSessionWithRelations(sessionId: number): Promise<QuestSessionEntity | null> {
-        return this.sessionRepository.findOne({
-            where: { questSessionId: sessionId },
-            relations: ['quest', 'quest.organizer', 'participants', 'participants.user'],
-        });
-    }
-
-    private isOrganizer(session: QuestSessionEntity, userId: number): boolean {
-        return session.quest.organizer.userId === userId;
-    }
-
-    private getParticipant(session: QuestSessionEntity, userId: number): ParticipantEntity | undefined {
-        return session.participants.find(p => p.user.userId === userId);
-    }
-
-    private getCurrentUser(session: QuestSessionEntity, userId: number, isOrganizer: boolean): UserEntity | null {
-        const participant = this.getParticipant(session, userId);
-        return participant?.user || (isOrganizer ? session.quest.organizer : null);
-    }
-
-    private isSessionActive(session: QuestSessionEntity): boolean {
-        const now = new Date();
-
-        if (session.endReason) {
-            return false;
-        }
-
-        if (now < session.startDate) {
-            return false;
-        }
-
-        if (session.endDate) {
-            return session.endDate > now;
-        }
-
-        const questDurationMs = session.quest.maxDurationMinutes * 60 * 1000;
-        const maxEndTime = new Date(session.startDate.getTime() + questDurationMs);
-
-        return now < maxEndTime;
-    }
-
-    private emitError(
-        client: AuthenticatedSocket,
-        event: string,
-        errorMessage: string,
-        logMessage?: string
-    ): ErrorResponse {
-        if (logMessage) {
-            console.error(logMessage);
-        }
-        const errorResponse: ErrorResponse = { success: false, error: errorMessage };
-        client.emit(event, errorResponse);
-        return errorResponse;
-    }
 
     private notifyUserJoined(sessionId: number, user: UserEntity): void {
         this.server.to(`session-${sessionId}`).emit('user-joined', {
@@ -375,6 +285,48 @@ export class LocationGateway implements OnGatewayConnection, OnGatewayDisconnect
             if (participants.size === 0) {
                 this.sessionParticipants.delete(sessionId);
             }
+        }
+    }
+
+    async notifyParticipantRejected(sessionId: number, participant: any): Promise<void> {
+        try {
+            if (!sessionId || sessionId <= 0) {
+                return;
+            }
+
+            if (!participant) {
+                return;
+            }
+
+            if (!participant.user) {
+                return;
+            }
+
+            const rejectionEvent = {
+                participantId: participant.participantId,
+                userId: participant.user.userId,
+                userName: participant.user.name,
+                sessionId,
+                rejectionReason: participant.rejectionReason || 'Unknown',
+                rejectedAt: new Date(),
+            };
+
+            const allSockets = await this.server.fetchSockets();
+
+            const participantSockets = allSockets.filter(
+                socket => (socket as unknown as AuthenticatedSocket).userId === participant.user.userId
+            );
+
+            for (const socket of participantSockets) {
+                socket.emit('participant-rejected', rejectionEvent);
+
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                socket.disconnect(true);
+            }
+
+        } catch (error) {
+            console.error('[location:notify] Error handling participant rejection:', error.message);
         }
     }
 }

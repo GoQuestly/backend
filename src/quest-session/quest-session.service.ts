@@ -3,7 +3,9 @@ import {
     NotFoundException,
     BadRequestException,
     ConflictException,
-    ForbiddenException
+    ForbiddenException,
+    forwardRef,
+    Inject
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -18,6 +20,7 @@ import { randomBytes } from 'crypto';
 import { JoinSessionDto } from "@/quest-session/dto/join-session.dto";
 import { QuestSessionResponseDto } from "@/quest-session/dto/quest-session-response.dto";
 import { QuestSessionListResponseDto } from "@/quest-session/dto/quest-session-list-response.dto";
+import { SessionParticipantGateway } from './session-participant.gateway';
 
 @Injectable()
 export class QuestSessionService {
@@ -30,6 +33,8 @@ export class QuestSessionService {
         private questRepository: Repository<QuestEntity>,
         @InjectRepository(UserEntity)
         private userRepository: Repository<UserEntity>,
+        @Inject(forwardRef(() => SessionParticipantGateway))
+        private participantGateway: SessionParticipantGateway,
     ) {}
 
     private generateInviteToken(): string {
@@ -347,6 +352,8 @@ export class QuestSessionService {
 
         await this.participantRepository.save(participant);
 
+        await this.participantGateway.notifyParticipantJoined(participant);
+
         return this.findById(session.questSessionId);
     }
 
@@ -364,16 +371,26 @@ export class QuestSessionService {
             throw new BadRequestException('Organizer cannot leave their own session');
         }
 
+        const now = new Date();
+        const isStarted = !session.endReason && session.startDate <= now && (!session.endDate || session.endDate > now);
+
+        if (isStarted) {
+            throw new BadRequestException('Cannot leave session while it is active');
+        }
+
         const participant = await this.participantRepository.findOne({
             where: {
                 session: { questSessionId: sessionId },
                 user: { userId },
             },
+            relations: ['user', 'session'],
         });
 
         if (!participant) {
             throw new NotFoundException('Participant not found in this session');
         }
+
+        await this.participantGateway.notifyParticipantLeft(sessionId, participant);
 
         await this.participantRepository.remove(participant);
     }

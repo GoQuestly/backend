@@ -7,6 +7,7 @@ import { LocationController } from './location.controller';
 import { QuestSessionService } from './quest-session.service';
 import { LocationService } from './location.service';
 import { LocationGateway } from './location.gateway';
+import { SessionParticipantGateway } from './session-participant.gateway';
 import { SessionEndValidatorService } from './session-end-validator.service';
 import { QuestSessionEntity } from '@/common/entities/QuestSessionEntity';
 import { ParticipantEntity } from '@/common/entities/ParticipantEntity';
@@ -38,6 +39,7 @@ import { EmailModule } from '@/email/email.module';
         QuestSessionService,
         LocationService,
         LocationGateway,
+        SessionParticipantGateway,
         SessionEndValidatorService,
     ],
     exports: [QuestSessionService, LocationService],

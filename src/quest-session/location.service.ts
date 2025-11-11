@@ -2,7 +2,9 @@ import {
     Injectable,
     NotFoundException,
     ForbiddenException,
-    BadRequestException
+    BadRequestException,
+    forwardRef,
+    Inject
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -16,6 +18,7 @@ import { UpdateLocationDto } from "@/quest-session/dto/update-location.dto";
 import { ParticipantLocationDto } from "@/quest-session/dto/participant-location.dto";
 import { LocationHistoryResponseDto } from "@/quest-session/dto/location-history-response.dto";
 import { ParticipantRouteDto } from "@/quest-session/dto/participant-route.dto";
+import { LocationGateway } from './location.gateway';
 
 @Injectable()
 export class LocationService {
@@ -26,6 +29,8 @@ export class LocationService {
         private participantRepository: Repository<ParticipantEntity>,
         @InjectRepository(QuestSessionEntity)
         private sessionRepository: Repository<QuestSessionEntity>,
+        @Inject(forwardRef(() => LocationGateway))
+        private locationGateway: LocationGateway,
     ) {}
 
     async updateLocation(
@@ -86,12 +91,14 @@ export class LocationService {
             if (distance > session.quest.startingRadiusMeters) {
                 participant.participationStatus = ParticipantStatus.REJECTED;
                 participant.rejectionReason = RejectionReason.TOO_FAR_FROM_START;
+                await this.participantRepository.save(participant);
+
+                await this.locationGateway.notifyParticipantRejected(sessionId, participant);
             } else {
                 participant.participationStatus = ParticipantStatus.APPROVED;
                 participant.rejectionReason = null;
+                await this.participantRepository.save(participant);
             }
-
-            await this.participantRepository.save(participant);
         }
 
         return this.mapToDto(savedLocation, participant);
@@ -223,6 +230,8 @@ export class LocationService {
                 participant.participationStatus = ParticipantStatus.REJECTED;
                 participant.rejectionReason = RejectionReason.NO_LOCATION;
                 await this.participantRepository.save(participant);
+
+                await this.locationGateway.notifyParticipantRejected(sessionId, participant);
             }
         }
     }
