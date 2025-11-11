@@ -37,4 +37,14 @@ export class QuestSessionListResponseDto {
         example: 5
     })
     participantCount: number;
+
+    @ApiProperty({
+        example: 10
+    })
+    questPointCount: number;
+
+    @ApiProperty({
+        example: 3
+    })
+    passedQuestPointCount: number;
 }

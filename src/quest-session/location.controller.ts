@@ -11,7 +11,6 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@/auth/jwt-auth.guard';
 import { GetUser } from '@/auth/decorators/get-user.decorator';
 import { LocationService } from './location.service';
-import { ParticipantLocationDto } from "@/quest-session/dto/participant-location.dto";
 import { LocationHistoryResponseDto } from "@/quest-session/dto/location-history-response.dto";
 import { GetLocationHistoryQueryDto } from "@/quest-session/dto/get-location-history-query.dto";
 
@@ -31,14 +30,5 @@ export class LocationController {
     ): Promise<LocationHistoryResponseDto> {
         const { participantId } = query;
         return this.locationService.getSessionLocations(sessionId, userId, participantId);
-    }
-
-    @Get(':sessionId/locations/latest')
-    @ApiOperation({})
-    async getLatestLocations(
-        @Param('sessionId', ParseIntPipe) sessionId: number,
-        @GetUser('userId') userId: number,
-    ): Promise<ParticipantLocationDto[]> {
-        return this.locationService.getLatestLocations(sessionId, userId);
     }
 }

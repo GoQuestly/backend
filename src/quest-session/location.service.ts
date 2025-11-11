@@ -178,10 +178,9 @@ export class LocationService {
         }
 
         const isOrganizer = session.quest.organizer.userId === userId;
-        const isParticipant = session.participants.some(p => p.user.userId === userId);
 
-        if (!isOrganizer && !isParticipant) {
-            throw new ForbiddenException('You do not have access to this session');
+        if (!isOrganizer) {
+            throw new ForbiddenException('Only the session organizer can access latest locations');
         }
 
         const latestLocations: ParticipantLocationDto[] = [];

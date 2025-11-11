@@ -14,10 +14,12 @@ import { ApiTags, ApiBearerAuth, ApiExtraModels } from '@nestjs/swagger';
 import { JwtAuthGuard } from '@/auth/jwt-auth.guard';
 import { GetUser } from '@/auth/decorators/get-user.decorator';
 import { QuestSessionService } from './quest-session.service';
+import { LocationService } from './location.service';
 import { QuestSessionDto } from './dto/quest-session.dto';
 import { GetQuestSessionsQueryDto } from "@/quest-session/dto/get-quest-sessions-query.dto";
 import { QuestSessionResponseDto } from "@/quest-session/dto/quest-session-response.dto";
 import { PaginatedQuestSessionsResponseDto } from "@/quest-session/dto/paginated-quest-sessions-response.dto";
+import { ParticipantLocationDto } from "@/quest-session/dto/participant-location.dto";
 
 @ApiTags('Organizer - Quest Sessions')
 @ApiBearerAuth()
@@ -27,6 +29,7 @@ import { PaginatedQuestSessionsResponseDto } from "@/quest-session/dto/paginated
 export class OrganizerSessionController {
     constructor(
         private readonly sessionService: QuestSessionService,
+        private readonly locationService: LocationService,
     ) {}
 
     @Post('quest/:questId/sessions')
@@ -74,5 +77,13 @@ export class OrganizerSessionController {
         @GetUser('userId') userId: number,
     ): Promise<QuestSessionResponseDto> {
         return this.sessionService.cancelSession(id, userId);
+    }
+
+    @Get('sessions/:id/locations/latest')
+    async getLatestLocations(
+        @Param('id', ParseIntPipe) id: number,
+        @GetUser('userId') userId: number,
+    ): Promise<ParticipantLocationDto[]> {
+        return this.locationService.getLatestLocations(id, userId);
     }
 }
