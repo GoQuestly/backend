@@ -20,6 +20,7 @@ import { randomBytes } from 'crypto';
 import { JoinSessionDto } from "@/quest-session/dto/join-session.dto";
 import { QuestSessionResponseDto } from "@/quest-session/dto/quest-session-response.dto";
 import { QuestSessionListResponseDto } from "@/quest-session/dto/quest-session-list-response.dto";
+import { SessionPointResponseDto } from "@/quest-session/dto/session-point-response.dto";
 import { SessionParticipantGateway } from './session-participant.gateway';
 
 @Injectable()
@@ -126,23 +127,25 @@ export class QuestSessionService {
     async findById(id: number, userId?: number): Promise<QuestSessionResponseDto> {
         const session = await this.sessionRepository.findOne({
             where: { questSessionId: id },
-            relations: ['quest', 'quest.organizer', 'participants', 'participants.user'],
+            relations: ['quest', 'quest.organizer', 'quest.points', 'participants', 'participants.user', 'participants.points'],
         });
 
         if (!session) {
             throw new NotFoundException(`Session with ID ${id} not found`);
         }
 
+        let currentParticipant: ParticipantEntity | undefined;
+
         if (userId) {
             const isOrganizer = session.quest.organizer.userId === userId;
-            const isParticipant = session.participants.some(p => p.user.userId === userId);
+            currentParticipant = session.participants.find(p => p.user.userId === userId);
 
-            if (!isOrganizer && !isParticipant) {
+            if (!isOrganizer && !currentParticipant) {
                 throw new ForbiddenException('You do not have access to this session');
             }
         }
 
-        return this.mapToResponseDto(session);
+        return this.mapToResponseDto(session, currentParticipant);
     }
 
     async findByQuestId(
@@ -192,7 +195,9 @@ export class QuestSessionService {
         const qb = this.participantRepository.createQueryBuilder('participant')
             .leftJoinAndSelect('participant.session', 'session')
             .leftJoinAndSelect('session.quest', 'quest')
+            .leftJoinAndSelect('quest.points', 'questPoints')
             .leftJoinAndSelect('session.participants', 'participants')
+            .leftJoinAndSelect('participant.points', 'participantPoints')
             .where('participant.user.userId = :userId', { userId })
             .orderBy('session.startDate', 'ASC')
             .skip(offset)
@@ -200,7 +205,7 @@ export class QuestSessionService {
 
         const [participants, total] = await qb.getManyAndCount();
 
-        const items = participants.map(p => this.mapToListResponseDto(p.session));
+        const items = participants.map(p => this.mapToListResponseDto(p.session, p));
 
         return {
             items,
@@ -395,7 +400,62 @@ export class QuestSessionService {
         await this.participantRepository.remove(participant);
     }
 
-    private mapToResponseDto(session: QuestSessionEntity): QuestSessionResponseDto {
+    async getSessionPoints(sessionId: number, userId: number): Promise<SessionPointResponseDto[]> {
+        const session = await this.sessionRepository.findOne({
+            where: { questSessionId: sessionId },
+            relations: ['quest', 'quest.organizer', 'quest.points', 'participants', 'participants.user', 'participants.points', 'participants.points.point'],
+        });
+
+        if (!session) {
+            throw new NotFoundException(`Session with ID ${sessionId} not found`);
+        }
+
+        const isOrganizer = session.quest.organizer.userId === userId;
+        const participant = session.participants.find(p => p.user.userId === userId);
+
+        if (!isOrganizer && !participant) {
+            throw new ForbiddenException('You do not have access to this session');
+        }
+
+        const questPoints = [...(session.quest.points || [])].sort((a, b) => a.orderNum - b.orderNum);
+
+        const passedPointIds = new Set(
+            (participant?.points || []).map(pp => pp.point.questPointId)
+        );
+
+        let maxPassedOrderNum = -1;
+        for (const point of questPoints) {
+            if (passedPointIds.has(point.questPointId)) {
+                maxPassedOrderNum = Math.max(maxPassedOrderNum, point.orderNum);
+            }
+        }
+
+        const firstPointOrderNum = questPoints[0]?.orderNum;
+
+        return questPoints.map(point => {
+            const isPassed = passedPointIds.has(point.questPointId);
+            const isFirstPoint = point.orderNum === firstPointOrderNum;
+            const isUnlocked = isFirstPoint || isPassed || point.orderNum === maxPassedOrderNum + 1;
+
+            return {
+                pointName: point.name,
+                orderNumber: point.orderNum,
+                isPassed,
+                pointLatitude: isUnlocked ? point.latitude : null,
+                pointLongitude: isUnlocked ? point.longitude : null,
+            };
+        });
+    }
+
+    private mapToResponseDto(session: QuestSessionEntity, participant?: ParticipantEntity): QuestSessionResponseDto {
+        const questPoints = session.quest.points || [];
+        const questPointCount = questPoints.length;
+        const passedQuestPointCount = participant?.points?.length || 0;
+
+        const startPoint = questPoints.length > 0
+            ? questPoints.reduce((min, point) => point.orderNum < min.orderNum ? point : min, questPoints[0])
+            : null;
+
         return {
             questSessionId: session.questSessionId,
             questId: session.quest.questId,
@@ -414,10 +474,19 @@ export class QuestSessionService {
             })),
             isActive: this.isSessionActive(session),
             participantCount: session.participants?.length || 0,
+            questPointCount,
+            passedQuestPointCount,
+            questPhotoUrl: session.quest.photoUrl || null,
+            questDescription: session.quest.description,
+            questMaxDurationMinutes: session.quest.maxDurationMinutes,
+            startPointName: startPoint?.name || '',
         };
     }
 
-    private mapToListResponseDto(session: QuestSessionEntity): QuestSessionListResponseDto {
+    private mapToListResponseDto(session: QuestSessionEntity, participant?: ParticipantEntity): QuestSessionListResponseDto {
+        const questPointCount = session.quest.points?.length || 0;
+        const passedQuestPointCount = participant?.points?.length || 0;
+
         return {
             questSessionId: session.questSessionId,
             questId: session.quest.questId,
@@ -426,6 +495,8 @@ export class QuestSessionService {
             endDate: session.endDate,
             isActive: this.isSessionActive(session),
             participantCount: session.participants?.length || 0,
+            questPointCount,
+            passedQuestPointCount,
         };
     }
 }

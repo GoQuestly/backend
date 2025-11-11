@@ -20,6 +20,7 @@ import { JoinSessionDto } from "@/quest-session/dto/join-session.dto";
 import { GetMySessionsQueryDto } from "@/quest-session/dto/get-my-sessions-query.dto";
 import { QuestSessionResponseDto } from "@/quest-session/dto/quest-session-response.dto";
 import { PaginatedMySessionsResponseDto } from "@/quest-session/dto/paginated-my-sessions-response.dto";
+import { SessionPointResponseDto } from "@/quest-session/dto/session-point-response.dto";
 
 @ApiTags('Participant - Quest Sessions')
 @ApiBearerAuth()
@@ -55,6 +56,14 @@ export class ParticipantSessionController {
         @GetUser('userId') userId: number,
     ): Promise<QuestSessionResponseDto> {
         return this.sessionService.findById(id, userId);
+    }
+
+    @Get(':id/points')
+    async getPoints(
+        @Param('id', ParseIntPipe) id: number,
+        @GetUser('userId') userId: number,
+    ): Promise<SessionPointResponseDto[]> {
+        return this.sessionService.getSessionPoints(id, userId);
     }
 
     @Delete(':id/leave')
