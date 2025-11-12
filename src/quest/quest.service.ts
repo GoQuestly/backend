@@ -1,16 +1,17 @@
-import {Injectable, BadRequestException, NotFoundException, Inject} from '@nestjs/common';
-import {InjectRepository} from '@nestjs/typeorm';
-import {Repository} from 'typeorm';
-import {QuestEntity} from '@/common/entities/QuestEntity';
-import {UserEntity} from '@/common/entities/UserEntity';
-import {CreateQuestDto} from './dto/create-quest.dto';
-import {UpdateQuestDto} from './dto/update-quest.dto';
-import {QuestResponseDto} from './dto/quest-response.dto';
+import { Injectable, BadRequestException, NotFoundException, Inject } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { QuestEntity } from '@/common/entities/QuestEntity';
+import { UserEntity } from '@/common/entities/UserEntity';
+import { CreateQuestDto } from './dto/create-quest.dto';
+import { UpdateQuestDto } from './dto/update-quest.dto';
+import { QuestResponseDto } from './dto/quest-response.dto';
 import * as fs from 'fs';
 import * as path from 'path';
-import {getAbsoluteUrl} from '@/common/utils/url.util';
-import {REQUEST} from '@nestjs/core';
-import {Request} from 'express';
+import { getAbsoluteUrl } from '@/common/utils/url.util';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
+import { QuestSessionService } from "@/quest-session/quest-session.service";
 
 @Injectable()
 export class QuestService {
@@ -20,6 +21,7 @@ export class QuestService {
         @InjectRepository(UserEntity)
         private userRepository: Repository<UserEntity>,
         @Inject(REQUEST) private readonly request: Request,
+        private questSessionService: QuestSessionService,
     ) {
     }
 
@@ -100,6 +102,8 @@ export class QuestService {
     ): Promise<QuestResponseDto> {
         const quest = await this.findQuestWithOrganizer(questId);
         this.verifyQuestOwnership(quest, userId);
+
+        await this.questSessionService.checkActiveSession(questId);
 
         Object.assign(quest, this.filterDefinedProperties(updateQuestDto));
 

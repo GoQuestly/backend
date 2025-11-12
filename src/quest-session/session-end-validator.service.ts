@@ -45,6 +45,15 @@ export class SessionEndValidatorService {
                 this.logger.log(`Processing session ${session.questSessionId} for end validation`);
 
                 try {
+                    if (!session.endDate) {
+                        const questDurationMs = session.quest.maxDurationMinutes * 60 * 1000;
+                        session.endDate = new Date(session.startDate.getTime() + questDurationMs);
+                        await this.sessionRepository.save(session);
+                        this.logger.log(
+                            `Set endDate for session ${session.questSessionId} to ${session.endDate}`
+                        );
+                    }
+
                     await this.locationService.rejectParticipantsWithoutLocation(
                         session.questSessionId
                     );
