@@ -8,8 +8,8 @@ import { QuestTaskType } from '@/common/enums/QuestTaskType';
 import { CreateQuestPointDto } from './dto/create-quest-point.dto';
 import { UpdateQuestPointDto } from './dto/update-quest-point.dto';
 import { QuestPointResponseDto } from './dto/quest-point-response.dto';
-import {CodeWordTaskResponseDto, PhotoTaskResponseDto, QuizTaskResponseDto} from "@/quest-task/dto";
-
+import { CodeWordTaskResponseDto, PhotoTaskResponseDto, QuizTaskResponseDto } from "@/quest-task/dto";
+import {QuestSessionService} from "@/quest-session/quest-session.service";
 
 @Injectable()
 export class QuestPointService {
@@ -18,6 +18,7 @@ export class QuestPointService {
         private questPointRepository: Repository<QuestPointEntity>,
         @InjectRepository(QuestEntity)
         private questRepository: Repository<QuestEntity>,
+        private questSessionService: QuestSessionService,
     ) {}
 
     async findAll(questId: number, organizerId: number): Promise<QuestPointResponseDto[]> {
@@ -57,6 +58,8 @@ export class QuestPointService {
             throw new ForbiddenException('Only the quest organizer can create quest points');
         }
 
+        await this.questSessionService.checkActiveSession(questId);
+
         const point = this.questPointRepository.create({
             ...dto,
             quest,
@@ -81,6 +84,8 @@ export class QuestPointService {
             throw new ForbiddenException('Only the quest organizer can update quest points');
         }
 
+        await this.questSessionService.checkActiveSession(point.quest.questId);
+
         if (dto.name !== undefined) point.name = dto.name;
         if (dto.latitude !== undefined) point.latitude = dto.latitude;
         if (dto.longitude !== undefined) point.longitude = dto.longitude;
@@ -104,6 +109,8 @@ export class QuestPointService {
         if (point.quest.organizer.userId !== organizerId) {
             throw new ForbiddenException('Only the quest organizer can remove quest points');
         }
+
+        await this.questSessionService.checkActiveSession(point.quest.questId);
 
         await this.questPointRepository.remove(point);
     }

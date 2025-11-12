@@ -22,6 +22,9 @@ import { QuestSessionResponseDto } from "@/quest-session/dto/quest-session-respo
 import { QuestSessionListResponseDto } from "@/quest-session/dto/quest-session-list-response.dto";
 import { SessionPointResponseDto } from "@/quest-session/dto/session-point-response.dto";
 import { SessionParticipantGateway } from './session-participant.gateway';
+import { REQUEST } from '@nestjs/core';
+import { Request } from 'express';
+import { getAbsoluteUrl } from '@/common/utils/url.util';
 
 @Injectable()
 export class QuestSessionService {
@@ -36,6 +39,7 @@ export class QuestSessionService {
         private userRepository: Repository<UserEntity>,
         @Inject(forwardRef(() => SessionParticipantGateway))
         private participantGateway: SessionParticipantGateway,
+        @Inject(REQUEST) private readonly request: Request,
     ) {}
 
     private generateInviteToken(): string {
@@ -66,7 +70,7 @@ export class QuestSessionService {
     async create(questId: number, dto: QuestSessionDto, organizerId: number): Promise<QuestSessionResponseDto> {
         const quest = await this.questRepository.findOne({
             where: { questId },
-            relations: ['organizer'],
+            relations: ['organizer', 'points'],
         });
 
         if (!quest) {
@@ -75,6 +79,10 @@ export class QuestSessionService {
 
         if (quest.organizer.userId !== organizerId) {
             throw new ForbiddenException('Only the quest organizer can create sessions');
+        }
+
+        if (!quest.points || quest.points.length === 0) {
+            throw new BadRequestException('Cannot create session for a quest without points');
         }
 
         const startDate = new Date(dto.startDate);
@@ -91,6 +99,10 @@ export class QuestSessionService {
         });
 
         for (const existingSession of existingSessions) {
+            if (existingSession.endReason !== null) {
+                continue;
+            }
+
             const existingStart = existingSession.startDate.getTime();
             const newStart = startDate.getTime();
 
@@ -400,6 +412,42 @@ export class QuestSessionService {
         await this.participantRepository.remove(participant);
     }
 
+    async checkActiveSession(questId: number): Promise<void> {
+        const sessions = await this.sessionRepository.find({
+            where: { quest: { questId } },
+            relations: ['quest'],
+        });
+
+        const now = new Date();
+        for (const session of sessions) {
+            if (session.endReason) {
+                continue;
+            }
+
+            if (session.startDate > now) {
+                continue;
+            }
+
+            if (session.endDate) {
+                if (session.endDate > now) {
+                    throw new BadRequestException(
+                        'Cannot modify quest or points while an active session exists'
+                    );
+                }
+                continue;
+            }
+
+            const questDurationMs = session.quest.maxDurationMinutes * 60 * 1000;
+            const maxEndTime = new Date(session.startDate.getTime() + questDurationMs);
+
+            if (now < maxEndTime) {
+                throw new BadRequestException(
+                    'Cannot modify quest or points while an active session exists'
+                );
+            }
+        }
+    }
+
     async getSessionPoints(sessionId: number, userId: number): Promise<SessionPointResponseDto[]> {
         const session = await this.sessionRepository.findOne({
             where: { questSessionId: sessionId },
@@ -468,6 +516,7 @@ export class QuestSessionService {
                 participantId: p.participantId,
                 userId: p.user.userId,
                 userName: p.user.name,
+                photoUrl: getAbsoluteUrl(this.request, p.user.photoUrl),
                 joinedAt: p.createdAt,
                 participationStatus: p.participationStatus,
                 rejectionReason: p.rejectionReason,
@@ -476,7 +525,7 @@ export class QuestSessionService {
             participantCount: session.participants?.length || 0,
             questPointCount,
             passedQuestPointCount,
-            questPhotoUrl: session.quest.photoUrl || null,
+            questPhotoUrl: getAbsoluteUrl(this.request, session.quest.photoUrl),
             questDescription: session.quest.description,
             questMaxDurationMinutes: session.quest.maxDurationMinutes,
             startPointName: startPoint?.name || '',

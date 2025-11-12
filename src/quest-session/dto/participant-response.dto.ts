@@ -20,6 +20,13 @@ export class ParticipantResponseDto {
     userName?: string;
 
     @ApiProperty({
+        example: '/uploads/users/photo.jpg',
+        nullable: true,
+        required: false
+    })
+    photoUrl?: string;
+
+    @ApiProperty({
         example: '2025-11-01T10:15:00Z'
     })
     joinedAt: Date;
