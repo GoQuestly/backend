@@ -23,13 +23,13 @@ import { forwardRef, Inject } from '@nestjs/common';
         origin: '*',
         credentials: true,
     },
-    namespace: '/location',
+    namespace: '/active-session',
 })
-export class LocationGateway extends AbstractSessionGateway {
+export class ActiveSessionGateway extends AbstractSessionGateway {
     @WebSocketServer()
     server: Server;
 
-    protected gatewayName = 'location';
+    protected gatewayName = 'active-session';
     private sessionParticipants: Map<number, Set<string>> = new Map();
 
     constructor(
@@ -142,6 +142,11 @@ export class LocationGateway extends AbstractSessionGateway {
             const { sessionId } = data;
             console.log(`[leave-session] User ${client.userId} leaving session ${sessionId}`);
 
+            if (client.sessionId !== sessionId) {
+                return this.emitError(client, 'leave-session-error', 'You are not connected to this session',
+                    `[leave-session] User ${client.userId} is not connected to session ${sessionId}`);
+            }
+
             const session = await this.getSessionWithRelations(sessionId);
 
             if (!session) {
@@ -150,11 +155,17 @@ export class LocationGateway extends AbstractSessionGateway {
             }
 
             const isOrganizer = this.isOrganizer(session, client.userId);
-            const isParticipant = session.participants.some(p => p.user.userId === client.userId);
+            const participant = this.getParticipant(session, client.userId);
+            const isParticipant = !!participant;
 
             if (!isOrganizer && !isParticipant) {
-                return this.emitError(client, 'leave-session-error', 'You are not a participant or organizer of this session',
-                    `[leave-session] User ${client.userId} is not a participant or organizer of session ${sessionId}`);
+                return this.emitError(client, 'leave-session-error', 'You do not have access to this session',
+                    `[leave-session] User ${client.userId} has no access to session ${sessionId}`);
+            }
+
+            if (!isOrganizer && participant && participant.participationStatus === ParticipantStatus.REJECTED) {
+                return this.emitError(client, 'leave-session-error', 'You have been rejected from this session',
+                    `[leave-session] User ${client.userId} has been rejected from session ${sessionId}`);
             }
 
             const currentUser = this.getCurrentUser(session, client.userId, isOrganizer);
@@ -197,8 +208,16 @@ export class LocationGateway extends AbstractSessionGateway {
                     `[update-location] Session ${sessionId} not found`);
             }
 
+            const isOrganizer = this.isOrganizer(session, client.userId);
             const participant = this.getParticipant(session, client.userId);
-            if (participant && participant.participationStatus === ParticipantStatus.REJECTED) {
+            const isParticipant = !!participant;
+
+            if (!isOrganizer && !isParticipant) {
+                return this.emitError(client, 'update-location-error', 'You do not have access to this session',
+                    `[update-location] User ${client.userId} has no access to session ${sessionId}`);
+            }
+
+            if (!isOrganizer && participant && participant.participationStatus === ParticipantStatus.REJECTED) {
                 return this.emitError(client, 'update-location-error', 'You have been rejected from this session',
                     `[update-location] User ${client.userId} has been rejected from session ${sessionId}`);
             }
@@ -311,6 +330,8 @@ export class LocationGateway extends AbstractSessionGateway {
                 rejectedAt: new Date(),
             };
 
+            this.server.to(`session-${sessionId}`).emit('participant-rejected', rejectionEvent);
+
             const allSockets = await this.server.fetchSockets();
 
             const participantSockets = allSockets.filter(
@@ -326,7 +347,28 @@ export class LocationGateway extends AbstractSessionGateway {
             }
 
         } catch (error) {
-            console.error('[location:notify] Error handling participant rejection:', error.message);
+            console.error('[active-session:notify] Error handling participant rejection:', error.message);
+        }
+    }
+
+    async notifySessionCancelled(sessionId: number, organizerName: string): Promise<void> {
+        try {
+            if (!sessionId || sessionId <= 0) {
+                return;
+            }
+
+            const cancellationEvent = {
+                sessionId,
+                cancelledBy: organizerName,
+                cancelledAt: new Date(),
+                message: 'Session has been cancelled by the organizer',
+            };
+
+            this.server.to(`session-${sessionId}`).emit('session-cancelled', cancellationEvent);
+
+            console.log(`[active-session:notify] Session ${sessionId} cancellation broadcasted`);
+        } catch (error) {
+            console.error('[active-session:notify] Error broadcasting session cancellation:', error.message);
         }
     }
 }
