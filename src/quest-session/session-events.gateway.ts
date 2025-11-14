@@ -36,13 +36,13 @@ interface ParticipantLeftEvent {
         origin: '*',
         credentials: true,
     },
-    namespace: '/participants',
+    namespace: '/session-events',
 })
-export class SessionParticipantGateway extends AbstractSessionGateway {
+export class SessionEventsGateway extends AbstractSessionGateway {
     @WebSocketServer()
     server: Server;
 
-    protected gatewayName = 'participants';
+    protected gatewayName = 'session-events';
 
     constructor(
         protected jwtService: JwtService,
@@ -95,7 +95,13 @@ export class SessionParticipantGateway extends AbstractSessionGateway {
                     `[participants:subscribe] User ${client.userId} has been rejected from session ${sessionId}`);
             }
 
-            client.join(`session-${sessionId}`);
+            const roomName = `session-${sessionId}`;
+            if (client.rooms.has(roomName)) {
+                return this.emitError(client, 'subscribe-error', 'You are already subscribed to this session',
+                    `[session-events:subscribe] User ${client.userId} already subscribed to session ${sessionId}`);
+            }
+
+            client.join(roomName);
 
             return {
                 success: true,
@@ -131,7 +137,29 @@ export class SessionParticipantGateway extends AbstractSessionGateway {
                 return this.emitError(client, 'unsubscribe-error', 'Invalid session ID');
             }
 
-            client.leave(`session-${sessionId}`);
+            const session = await this.getSessionWithRelations(sessionId);
+
+            if (!session) {
+                return this.emitError(client, 'unsubscribe-error', 'Session not found',
+                    `[participants:unsubscribe] Session ${sessionId} not found`);
+            }
+
+            const isOrganizer = this.isOrganizer(session, client.userId);
+            const participant = this.getParticipant(session, client.userId);
+            const isParticipant = !!participant;
+
+            if (!isOrganizer && !isParticipant) {
+                return this.emitError(client, 'unsubscribe-error', 'You do not have access to this session',
+                    `[participants:unsubscribe] User ${client.userId} has no access to session ${sessionId}`);
+            }
+
+            const roomName = `session-${sessionId}`;
+            if (!client.rooms.has(roomName)) {
+                return this.emitError(client, 'unsubscribe-error', 'You are not subscribed to this session',
+                    `[session-events:unsubscribe] User ${client.userId} not subscribed to session ${sessionId}`);
+            }
+
+            client.leave(roomName);
 
             return {
                 success: true,
@@ -205,6 +233,27 @@ export class SessionParticipantGateway extends AbstractSessionGateway {
             this.server.to(`session-${sessionId}`).emit('participant-left', event);
         } catch (error) {
             console.error('[participants:notify] Error broadcasting participant-left:', error.message);
+        }
+    }
+
+    async notifySessionCancelled(sessionId: number, organizerName: string): Promise<void> {
+        try {
+            if (!sessionId || sessionId <= 0) {
+                return;
+            }
+
+            const cancellationEvent = {
+                sessionId,
+                cancelledBy: organizerName,
+                cancelledAt: new Date(),
+                message: 'Session has been cancelled by the organizer',
+            };
+
+            this.server.to(`session-${sessionId}`).emit('session-cancelled', cancellationEvent);
+
+            console.log(`[session-events:notify] Session ${sessionId} cancellation broadcasted`);
+        } catch (error) {
+            console.error('[session-events:notify] Error broadcasting session cancellation:', error.message);
         }
     }
 }

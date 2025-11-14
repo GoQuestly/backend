@@ -18,7 +18,7 @@ import { UpdateLocationDto } from "@/quest-session/dto/update-location.dto";
 import { ParticipantLocationDto } from "@/quest-session/dto/participant-location.dto";
 import { LocationHistoryResponseDto } from "@/quest-session/dto/location-history-response.dto";
 import { ParticipantRouteDto } from "@/quest-session/dto/participant-route.dto";
-import { LocationGateway } from './location.gateway';
+import { ActiveSessionGateway } from './active-session.gateway';
 
 @Injectable()
 export class LocationService {
@@ -29,8 +29,8 @@ export class LocationService {
         private participantRepository: Repository<ParticipantEntity>,
         @InjectRepository(QuestSessionEntity)
         private sessionRepository: Repository<QuestSessionEntity>,
-        @Inject(forwardRef(() => LocationGateway))
-        private locationGateway: LocationGateway,
+        @Inject(forwardRef(() => ActiveSessionGateway))
+        private locationGateway: ActiveSessionGateway,
     ) {}
 
     async updateLocation(

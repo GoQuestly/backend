@@ -21,7 +21,8 @@ import { JoinSessionDto } from "@/quest-session/dto/join-session.dto";
 import { QuestSessionResponseDto } from "@/quest-session/dto/quest-session-response.dto";
 import { QuestSessionListResponseDto } from "@/quest-session/dto/quest-session-list-response.dto";
 import { SessionPointResponseDto } from "@/quest-session/dto/session-point-response.dto";
-import { SessionParticipantGateway } from './session-participant.gateway';
+import { SessionEventsGateway } from './session-events.gateway';
+import { ActiveSessionGateway } from './active-session.gateway';
 import { REQUEST } from '@nestjs/core';
 import { Request } from 'express';
 import { getAbsoluteUrl } from '@/common/utils/url.util';
@@ -37,8 +38,10 @@ export class QuestSessionService {
         private questRepository: Repository<QuestEntity>,
         @InjectRepository(UserEntity)
         private userRepository: Repository<UserEntity>,
-        @Inject(forwardRef(() => SessionParticipantGateway))
-        private participantGateway: SessionParticipantGateway,
+        @Inject(forwardRef(() => SessionEventsGateway))
+        private participantGateway: SessionEventsGateway,
+        @Inject(forwardRef(() => ActiveSessionGateway))
+        private activeSessionGateway: ActiveSessionGateway,
         @Inject(REQUEST) private readonly request: Request,
     ) {}
 
@@ -304,6 +307,12 @@ export class QuestSessionService {
 
         await this.sessionRepository.save(session);
 
+        const organizerName = session.quest.organizer.name;
+        await Promise.all([
+            this.activeSessionGateway.notifySessionCancelled(id, organizerName),
+            this.participantGateway.notifySessionCancelled(id, organizerName),
+        ]);
+
         return this.findById(id);
     }
 
@@ -459,9 +468,14 @@ export class QuestSessionService {
         }
 
         const isOrganizer = session.quest.organizer.userId === userId;
+
+        if (isOrganizer) {
+            throw new ForbiddenException('Organizer cannot receive information about points through participant endpoint');
+        }
+
         const participant = session.participants.find(p => p.user.userId === userId);
 
-        if (!isOrganizer && !participant) {
+        if (!participant) {
             throw new ForbiddenException('You do not have access to this session');
         }
 

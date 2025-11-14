@@ -1,7 +1,8 @@
 import {Request} from 'express';
 
 export function getBaseUrl(request: Request): string {
-    const protocol = request.protocol;
+    const isProduction = process.env.NODE_ENV === 'production';
+    const protocol = isProduction ? 'https' : request.protocol;
     const host = request.get('host');
     return `${protocol}://${host}`;
 }
