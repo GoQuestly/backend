@@ -1,7 +1,7 @@
-import { IsInt, IsString, IsBoolean, Min, IsNotEmpty, Max } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
-import { QuestTaskType } from '@/common/enums/QuestTaskType';
-import { MAX_TASK_DURATION_SECONDS } from "@/quest-task/quest-task.constants";
+import {IsBoolean, IsInt, IsNotEmpty, IsString, Max, Min} from 'class-validator';
+import {ApiProperty} from '@nestjs/swagger';
+import {QuestTaskType} from '@/common/enums/QuestTaskType';
+import {MAX_TASK_DURATION_SECONDS} from "@/quest-task/quest-task.constants";
 
 export class BaseCodeWordTaskDto {
     @ApiProperty({ example: 'Find the code word hidden in the location', required: false })
@@ -21,7 +21,7 @@ export class BaseCodeWordTaskDto {
 
     @ApiProperty({ example: 100, description: 'Score points for completing the task' })
     @IsInt()
-    @Min(0)
+    @Min(15)
     scorePointsCount?: number;
 
     @ApiProperty({ example: 'SECRET123' })
