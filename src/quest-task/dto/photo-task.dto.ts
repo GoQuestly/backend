@@ -1,7 +1,7 @@
-import { IsInt, IsString, IsBoolean, Min, IsNotEmpty, Max } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
-import { QuestTaskType } from '@/common/enums/QuestTaskType';
-import { MAX_TASK_DURATION_SECONDS } from "@/quest-task/quest-task.constants";
+import {IsBoolean, IsInt, IsNotEmpty, IsString, Max, Min} from 'class-validator';
+import {ApiProperty} from '@nestjs/swagger';
+import {QuestTaskType} from '@/common/enums/QuestTaskType';
+import {MAX_TASK_DURATION_SECONDS} from "@/quest-task/quest-task.constants";
 
 export class BasePhotoTaskDto {
     @ApiProperty({ example: 'Take a photo at the landmark', required: false })
@@ -11,7 +11,7 @@ export class BasePhotoTaskDto {
 
     @ApiProperty({ example: 300 })
     @IsInt()
-    @Min(0)
+    @Min(15)
     @Max(MAX_TASK_DURATION_SECONDS)
     maxDurationSeconds: number;
 

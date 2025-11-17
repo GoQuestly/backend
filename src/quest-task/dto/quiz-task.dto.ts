@@ -47,7 +47,7 @@ export class BaseQuizTaskDto {
 
     @ApiProperty({ example: 300 })
     @IsInt()
-    @Min(0)
+    @Min(15)
     @Max(MAX_TASK_DURATION_SECONDS)
     maxDurationSeconds: number;
 
