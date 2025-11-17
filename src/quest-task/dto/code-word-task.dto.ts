@@ -11,7 +11,7 @@ export class BaseCodeWordTaskDto {
 
     @ApiProperty({ example: 300 })
     @IsInt()
-    @Min(0)
+    @Min(15)
     @Max(MAX_TASK_DURATION_SECONDS)
     maxDurationSeconds: number;
 
@@ -21,7 +21,7 @@ export class BaseCodeWordTaskDto {
 
     @ApiProperty({ example: 100, description: 'Score points for completing the task' })
     @IsInt()
-    @Min(15)
+    @Min(0)
     scorePointsCount?: number;
 
     @ApiProperty({ example: 'SECRET123' })
