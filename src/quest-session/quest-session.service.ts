@@ -1,31 +1,32 @@
 import {
-    Injectable,
-    NotFoundException,
     BadRequestException,
     ConflictException,
     ForbiddenException,
     forwardRef,
-    Inject
+    Inject,
+    Injectable,
+    NotFoundException
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { QuestSessionEntity } from '@/common/entities/QuestSessionEntity';
-import { ParticipantEntity } from '@/common/entities/ParticipantEntity';
-import { QuestEntity } from '@/common/entities/QuestEntity';
-import { UserEntity } from '@/common/entities/UserEntity';
-import { QuestSessionEndReason } from '@/common/enums/QuestSessionEndReason';
-import { ParticipantStatus } from '@/common/enums/ParticipantStatus';
-import { QuestSessionDto } from './dto/quest-session.dto';
-import { randomBytes } from 'crypto';
-import { JoinSessionDto } from "@/quest-session/dto/join-session.dto";
-import { QuestSessionResponseDto } from "@/quest-session/dto/quest-session-response.dto";
-import { QuestSessionListResponseDto } from "@/quest-session/dto/quest-session-list-response.dto";
-import { SessionPointResponseDto } from "@/quest-session/dto/session-point-response.dto";
-import { SessionEventsGateway } from './session-events.gateway';
-import { ActiveSessionGateway } from './active-session.gateway';
-import { REQUEST } from '@nestjs/core';
-import { Request } from 'express';
-import { getAbsoluteUrl } from '@/common/utils/url.util';
+import {InjectRepository} from '@nestjs/typeorm';
+import {isSessionActive} from '@/common/utils/session.util';
+import {Repository} from 'typeorm';
+import {QuestSessionEntity} from '@/common/entities/QuestSessionEntity';
+import {ParticipantEntity} from '@/common/entities/ParticipantEntity';
+import {QuestEntity} from '@/common/entities/QuestEntity';
+import {UserEntity} from '@/common/entities/UserEntity';
+import {QuestSessionEndReason} from '@/common/enums/QuestSessionEndReason';
+import {ParticipantStatus} from '@/common/enums/ParticipantStatus';
+import {QuestSessionDto} from './dto/quest-session.dto';
+import {randomBytes} from 'crypto';
+import {JoinSessionDto} from "@/quest-session/dto/join-session.dto";
+import {QuestSessionResponseDto} from "@/quest-session/dto/quest-session-response.dto";
+import {QuestSessionListResponseDto} from "@/quest-session/dto/quest-session-list-response.dto";
+import {SessionPointResponseDto} from "@/quest-session/dto/session-point-response.dto";
+import {SessionEventsGateway} from './session-events.gateway';
+import {ActiveSessionGateway} from './active-session.gateway';
+import {REQUEST} from '@nestjs/core';
+import {Request} from 'express';
+import {getAbsoluteUrl} from '@/common/utils/url.util';
 
 @Injectable()
 export class QuestSessionService {
@@ -49,26 +50,6 @@ export class QuestSessionService {
         return randomBytes(16).toString('hex');
     }
 
-    private isSessionActive(session: QuestSessionEntity): boolean {
-        const now = new Date();
-
-        if (session.endReason) {
-            return false;
-        }
-
-        if (session.startDate > now) {
-            return false;
-        }
-
-        if (session.endDate) {
-            return session.endDate > now;
-        }
-
-        const questDurationMs = session.quest.maxDurationMinutes * 60 * 1000;
-        const maxEndTime = new Date(session.startDate.getTime() + questDurationMs);
-
-        return now < maxEndTime;
-    }
 
     async create(questId: number, dto: QuestSessionDto, organizerId: number): Promise<QuestSessionResponseDto> {
         const quest = await this.questRepository.findOne({
@@ -535,7 +516,7 @@ export class QuestSessionService {
                 participationStatus: p.participationStatus,
                 rejectionReason: p.rejectionReason,
             })),
-            isActive: this.isSessionActive(session),
+            isActive: isSessionActive(session),
             participantCount: session.participants?.length || 0,
             questPointCount,
             passedQuestPointCount,
@@ -556,7 +537,7 @@ export class QuestSessionService {
             questTitle: session.quest.title,
             startDate: session.startDate,
             endDate: session.endDate,
-            isActive: this.isSessionActive(session),
+            isActive: isSessionActive(session),
             participantCount: session.participants?.length || 0,
             questPointCount,
             passedQuestPointCount,

@@ -1,22 +1,20 @@
-import {
-    WebSocketGateway,
-    WebSocketServer,
-    SubscribeMessage,
-    ConnectedSocket,
-    MessageBody,
-} from '@nestjs/websockets';
-import { Server } from 'socket.io';
-import { LocationService } from './location.service';
-import { JwtService } from '@nestjs/jwt';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { QuestSessionEntity } from '@/common/entities/QuestSessionEntity';
-import { ParticipantStatus } from '@/common/enums/ParticipantStatus';
-import { UpdateLocationDto } from "@/quest-session/dto/update-location.dto";
-import { UserEntity } from '@/common/entities/UserEntity';
-import { AbstractSessionGateway } from './abstract-session.gateway';
-import { AuthenticatedSocket, ErrorResponse } from './gateway.types';
-import { forwardRef, Inject } from '@nestjs/common';
+import {ConnectedSocket, MessageBody, SubscribeMessage, WebSocketGateway, WebSocketServer,} from '@nestjs/websockets';
+import {Server} from 'socket.io';
+import {LocationService} from './location.service';
+import {JwtService} from '@nestjs/jwt';
+import {InjectRepository} from '@nestjs/typeorm';
+import {Repository} from 'typeorm';
+import {QuestSessionEntity} from '@/common/entities/QuestSessionEntity';
+import {ParticipantStatus} from '@/common/enums/ParticipantStatus';
+import {UpdateLocationDto} from "@/quest-session/dto/update-location.dto";
+import {UserEntity} from '@/common/entities/UserEntity';
+import {AbstractSessionGateway} from './abstract-session.gateway';
+import {AuthenticatedSocket, ErrorResponse} from './gateway.types';
+import {forwardRef, Inject} from '@nestjs/common';
+import {QuestPointEntity} from '@/common/entities/QuestPointEntity';
+import {ParticipantPointEntity} from '@/common/entities/ParticipantPointEntity';
+import {calculateDistance, POINT_COMPLETION_RADIUS_METERS} from './participant-task.constants';
+import {isSessionActive} from '@/common/utils/session.util';
 
 @WebSocketGateway({
     cors: {
@@ -38,6 +36,10 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
         protected jwtService: JwtService,
         @InjectRepository(QuestSessionEntity)
         protected sessionRepository: Repository<QuestSessionEntity>,
+        @InjectRepository(QuestPointEntity)
+        private questPointRepository: Repository<QuestPointEntity>,
+        @InjectRepository(ParticipantPointEntity)
+        private participantPointRepository: Repository<ParticipantPointEntity>,
     ) {
         super();
     }
@@ -98,7 +100,7 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
                     `[join-session] User ${client.userId} has been rejected from session ${sessionId}`);
             }
 
-            if (!this.isSessionActive(session)) {
+            if (!isSessionActive(session)) {
                 return this.emitError(client, 'join-session-error', 'Session is not active',
                     `[join-session] Session ${sessionId} is not active`);
             }
@@ -237,6 +239,18 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
 
             await this.notifyOrganizerLocationUpdate(sessionId, session.quest.organizer.userId, location);
 
+            const pointPassedResult = await this.checkAndPassPoint(sessionId, client.userId, latitude, longitude);
+
+            if (pointPassedResult) {
+                client.emit('point-passed', pointPassedResult);
+
+                await this.notifyOrganizerPointPassed(sessionId, session.quest.organizer.userId, {
+                    ...pointPassedResult,
+                    userId: client.userId,
+                    userName: participant.user.name,
+                });
+            }
+
             return { success: true, location };
         } catch (error) {
             console.error(`[update-location] Error:`, error.message);
@@ -369,6 +383,134 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
             console.log(`[active-session:notify] Session ${sessionId} cancellation broadcasted`);
         } catch (error) {
             console.error('[active-session:notify] Error broadcasting session cancellation:', error.message);
+        }
+    }
+
+    private async checkAndPassPoint(
+        sessionId: number,
+        userId: number,
+        latitude: number,
+        longitude: number
+    ): Promise<{ pointPassed: boolean; pointName: string; orderNumber: number; questPointId: number } | null> {
+        try {
+            const session = await this.sessionRepository.findOne({
+                where: {questSessionId: sessionId},
+                relations: ['quest', 'quest.points', 'participants', 'participants.user', 'participants.points', 'participants.points.point'],
+            });
+
+            if (!session) {
+                return null;
+            }
+
+            const participant = session.participants.find(p => p.user.userId === userId);
+
+            if (!participant) {
+                return null;
+            }
+
+            const questPoints = [...(session.quest.points || [])].sort((a, b) => a.orderNum - b.orderNum);
+
+            if (questPoints.length === 0) {
+                return null;
+            }
+
+            const passedPointIds = new Set(
+                (participant?.points || []).map(pp => pp.point.questPointId)
+            );
+
+            let nextPoint: QuestPointEntity | null = null;
+
+            let maxPassedOrderNum = -1;
+            for (const qp of questPoints) {
+                if (passedPointIds.has(qp.questPointId)) {
+                    maxPassedOrderNum = Math.max(maxPassedOrderNum, qp.orderNum);
+                }
+            }
+
+            for (const point of questPoints) {
+                if (passedPointIds.has(point.questPointId)) {
+                    continue;
+                }
+
+                const isFirstPoint = point.orderNum === questPoints[0].orderNum;
+                const isNextPoint = point.orderNum === maxPassedOrderNum + 1;
+
+                if (isFirstPoint || isNextPoint) {
+                    nextPoint = point;
+                    break;
+                }
+            }
+
+            if (!nextPoint) {
+                return null;
+            }
+
+            const distance = calculateDistance(latitude, longitude, nextPoint.latitude, nextPoint.longitude);
+
+            console.log(`[checkAndPassPoint] User ${userId} distance to point ${nextPoint.questPointId}: ${distance}m (threshold: ${POINT_COMPLETION_RADIUS_METERS}m)`);
+
+            if (distance <= POINT_COMPLETION_RADIUS_METERS) {
+                const alreadyPassed = await this.participantPointRepository.findOne({
+                    where: {
+                        participant: {participantId: participant.participantId},
+                        point: {questPointId: nextPoint.questPointId},
+                    },
+                });
+
+                if (alreadyPassed) {
+                    console.log(`[checkAndPassPoint] Point ${nextPoint.questPointId} already passed by user ${userId}`);
+                    return null;
+                }
+
+                const participantPoint = this.participantPointRepository.create({
+                    participant,
+                    point: nextPoint,
+                    passedDate: new Date(),
+                });
+
+                await this.participantPointRepository.save(participantPoint);
+
+                console.log(`[checkAndPassPoint] User ${userId} passed point ${nextPoint.questPointId}`);
+
+                return {
+                    pointPassed: true,
+                    pointName: nextPoint.name,
+                    orderNumber: nextPoint.orderNum,
+                    questPointId: nextPoint.questPointId,
+                };
+            }
+
+            return null;
+        } catch (error) {
+            console.error(`[checkAndPassPoint] Error:`, error.message);
+            return null;
+        }
+    }
+
+    private async notifyOrganizerPointPassed(
+        sessionId: number,
+        organizerUserId: number,
+        data: {
+            pointPassed: boolean;
+            pointName: string;
+            orderNumber: number;
+            questPointId: number;
+            userId: number;
+            userName: string;
+        }
+    ): Promise<void> {
+        try {
+            const organizerSockets = await this.server.in(`session-${sessionId}`).fetchSockets();
+
+            for (const socket of organizerSockets) {
+                const authSocket = socket as unknown as AuthenticatedSocket;
+                if (authSocket.userId === organizerUserId) {
+                    socket.emit('participant-point-passed', data);
+                    console.log(`[notifyOrganizerPointPassed] Notified organizer ${organizerUserId} about participant ${data.userId} passing point ${data.questPointId}`);
+                }
+            }
+        } catch (error) {
+            console.error(`[notifyOrganizerPointPassed] Error:`, error.message);
         }
     }
 }

@@ -1,4 +1,4 @@
-import {Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToOne} from 'typeorm';
+import {Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn} from 'typeorm';
 import { ParticipantTaskEntity } from './ParticipantTaskEntity';
 
 @Entity('participant_task_photos')
@@ -15,6 +15,7 @@ export class ParticipantTaskPhotoEntity {
     @Column({ name: "is_approved" })
     isApproved: boolean;
 
-    @OneToOne(() => ParticipantTaskEntity, (pt) => pt.photos)
+    @OneToOne(() => ParticipantTaskEntity, (pt) => pt.photo)
+    @JoinColumn({ name: "participant_task_id" })
     participantTask: ParticipantTaskEntity;
 }
