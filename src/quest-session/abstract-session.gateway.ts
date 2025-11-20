@@ -1,11 +1,11 @@
-import { OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
-import { Server } from 'socket.io';
-import { JwtService } from '@nestjs/jwt';
-import { Repository } from 'typeorm';
-import { QuestSessionEntity } from '@/common/entities/QuestSessionEntity';
-import { ParticipantEntity } from '@/common/entities/ParticipantEntity';
-import { UserEntity } from '@/common/entities/UserEntity';
-import { AuthenticatedSocket, ErrorResponse } from './gateway.types';
+import {OnGatewayConnection, OnGatewayDisconnect} from '@nestjs/websockets';
+import {Server} from 'socket.io';
+import {JwtService} from '@nestjs/jwt';
+import {Repository} from 'typeorm';
+import {QuestSessionEntity} from '@/common/entities/QuestSessionEntity';
+import {ParticipantEntity} from '@/common/entities/ParticipantEntity';
+import {UserEntity} from '@/common/entities/UserEntity';
+import {AuthenticatedSocket, ErrorResponse} from './gateway.types';
 
 export abstract class AbstractSessionGateway implements OnGatewayConnection, OnGatewayDisconnect {
     abstract server: Server;
@@ -67,26 +67,6 @@ export abstract class AbstractSessionGateway implements OnGatewayConnection, OnG
         return participant?.user || (isOrganizer ? session.quest.organizer : null);
     }
 
-    protected isSessionActive(session: QuestSessionEntity): boolean {
-        const now = new Date();
-
-        if (session.endReason) {
-            return false;
-        }
-
-        if (now < session.startDate) {
-            return false;
-        }
-
-        if (session.endDate) {
-            return session.endDate > now;
-        }
-
-        const questDurationMs = session.quest.maxDurationMinutes * 60 * 1000;
-        const maxEndTime = new Date(session.startDate.getTime() + questDurationMs);
-
-        return now < maxEndTime;
-    }
 
     protected emitError(
         client: AuthenticatedSocket,
