@@ -1,24 +1,25 @@
 import {
-    Injectable,
-    NotFoundException,
-    ForbiddenException,
     BadRequestException,
+    ForbiddenException,
     forwardRef,
-    Inject
+    Inject,
+    Injectable,
+    NotFoundException
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import {InjectRepository} from '@nestjs/typeorm';
+import {Repository} from 'typeorm';
 import * as polyline from '@mapbox/polyline';
-import { ParticipantLocationEntity } from '@/common/entities/ParticipantLocationEntity';
-import { ParticipantEntity } from '@/common/entities/ParticipantEntity';
-import { QuestSessionEntity } from '@/common/entities/QuestSessionEntity';
-import { ParticipantStatus } from '@/common/enums/ParticipantStatus';
-import { RejectionReason } from '@/common/enums/RejectionReason';
-import { UpdateLocationDto } from "@/quest-session/dto/update-location.dto";
-import { ParticipantLocationDto } from "@/quest-session/dto/participant-location.dto";
-import { LocationHistoryResponseDto } from "@/quest-session/dto/location-history-response.dto";
-import { ParticipantRouteDto } from "@/quest-session/dto/participant-route.dto";
-import { ActiveSessionGateway } from './active-session.gateway';
+import {ParticipantLocationEntity} from '@/common/entities/ParticipantLocationEntity';
+import {ParticipantEntity} from '@/common/entities/ParticipantEntity';
+import {QuestSessionEntity} from '@/common/entities/QuestSessionEntity';
+import {ParticipantStatus} from '@/common/enums/ParticipantStatus';
+import {RejectionReason} from '@/common/enums/RejectionReason';
+import {UpdateLocationDto} from "@/quest-session/dto/update-location.dto";
+import {ParticipantLocationDto} from "@/quest-session/dto/participant-location.dto";
+import {LocationHistoryResponseDto} from "@/quest-session/dto/location-history-response.dto";
+import {ParticipantRouteDto} from "@/quest-session/dto/participant-route.dto";
+import {ActiveSessionGateway} from './active-session.gateway';
+import {calculateDistance} from "@/quest-session/participant-task.constants";
 
 @Injectable()
 export class LocationService {
@@ -81,7 +82,7 @@ export class LocationService {
         const savedLocation = await this.locationRepository.save(location);
 
         if (isFirstLocation && participant.participationStatus === ParticipantStatus.PENDING) {
-            const distance = this.calculateDistance(
+            const distance = calculateDistance(
                 session.quest.startingLatitude,
                 session.quest.startingLongitude,
                 dto.latitude,
@@ -233,21 +234,6 @@ export class LocationService {
                 await this.locationGateway.notifyParticipantRejected(sessionId, participant);
             }
         }
-    }
-
-    private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-        const R = 6371e3;
-        const phi1 = (lat1 * Math.PI) / 180;
-        const phi2 = (lat2 * Math.PI) / 180;
-        const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
-        const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
-
-        const a =
-            Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
-            Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-        return R * c;
     }
 
     private mapToDto(location: ParticipantLocationEntity, participant: ParticipantEntity): ParticipantLocationDto {

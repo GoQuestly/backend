@@ -31,14 +31,19 @@ export class QuizQuestionDto {
     @Min(0)
     scorePointsCount: number;
 
-    @ApiProperty({ type: [QuizAnswerDto] })
+    @ApiProperty({
+        type: [QuizAnswerDto],
+        example: [
+            {answer: 'London', isCorrect: true},
+            {answer: 'Paris', isCorrect: false}
+        ]
+    })
     @IsArray()
     @ArrayMinSize(2)
     @ValidateNested({ each: true })
     @Type(() => QuizAnswerDto)
     answers: QuizAnswerDto[];
 }
-
 export class BaseQuizTaskDto {
     @ApiProperty({ example: 'Complete the quiz to proceed', required: false })
     @IsString()
@@ -47,7 +52,7 @@ export class BaseQuizTaskDto {
 
     @ApiProperty({ example: 300 })
     @IsInt()
-    @Min(0)
+    @Min(15)
     @Max(MAX_TASK_DURATION_SECONDS)
     maxDurationSeconds: number;
 
@@ -61,7 +66,20 @@ export class BaseQuizTaskDto {
     @Max(100)
     successScorePointsPercent: number;
 
-    @ApiProperty({ type: [QuizQuestionDto] })
+    @ApiProperty({
+        type: [QuizQuestionDto],
+        example: [
+            {
+                question: 'What is the capital of Great Britain?',
+                orderNumber: 1,
+                scorePointsCount: 10,
+                answers: [
+                    {answer: 'London', isCorrect: true},
+                    {answer: 'Paris', isCorrect: false}
+                ]
+            }
+        ]
+    })
     @IsArray()
     @ValidateNested({ each: true })
     @Type(() => QuizQuestionDto)
