@@ -16,11 +16,20 @@ export class ParticipantTaskEntity {
     task: QuestTaskEntity;
 
     @OneToOne(() => ParticipantTaskPhotoEntity, (photo) => photo.participantTask)
-    photos: ParticipantTaskPhotoEntity[];
+    photo: ParticipantTaskPhotoEntity;
 
     @OneToMany(() => ParticipantTaskQuizAnswerEntity, (a) => a.participantTask)
     quizAnswers: ParticipantTaskQuizAnswerEntity[];
 
-    @Column({ name: "completed_date"})
+    @Column({ name: "start_date", nullable: true })
+    startDate: Date;
+
+    @Column({ name: "completed_date", nullable: true })
     completedDate: Date;
+
+    @Column({ name: "code_word", nullable: true })
+    codeWord: string;
+
+    @Column({ name: "score_earned", default: 0 })
+    scoreEarned: number;
 }

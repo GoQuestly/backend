@@ -20,8 +20,10 @@ import {UserEntity} from '@/common/entities/UserEntity';
 import {QuestPointEntity} from '@/common/entities/QuestPointEntity'; // NEW
 import {QuestTaskEntity} from '@/common/entities/QuestTaskEntity'; // NEW
 import {ParticipantTaskEntity} from '@/common/entities/ParticipantTaskEntity'; // NEW
-import {QuizQuestionEntity} from '@/common/entities/QuizQuestionEntity'; // NEW
-import {QuizAnswerEntity} from '@/common/entities/QuizAnswerEntity'; // NEW
+import {QuizQuestionEntity} from '@/common/entities/QuizQuestionEntity';
+import {QuizAnswerEntity} from '@/common/entities/QuizAnswerEntity';
+import {ParticipantTaskQuizAnswerEntity} from '@/common/entities/ParticipantTaskQuizAnswerEntity';
+import {ParticipantTaskPhotoEntity} from '@/common/entities/ParticipantTaskPhotoEntity';
 import {EmailModule} from '@/email/email.module';
 
 @Module({
@@ -38,6 +40,8 @@ import {EmailModule} from '@/email/email.module';
             ParticipantTaskEntity,
             QuizQuestionEntity,
             QuizAnswerEntity,
+            ParticipantTaskQuizAnswerEntity,
+            ParticipantTaskPhotoEntity,
         ]),
         JwtModule.register({
             secret: process.env.JWT_SECRET,
