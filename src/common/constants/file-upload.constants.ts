@@ -16,3 +16,10 @@ export const QUEST_COVER_UPLOAD_CONFIG: FileUploadConfig = {
     allowedMimeTypesRegex: /\/(jpg|jpeg|png|gif)$/,
     errorMessage: 'Only image files are allowed (JPG, PNG, GIF)',
 };
+
+export const TASK_PHOTO_UPLOAD_CONFIG: FileUploadConfig = {
+    destination: './uploads/task-photos',
+    maxFileSize: MAX_AVATAR_SIZE_BYTES,
+    allowedMimeTypesRegex: /\/(jpg|jpeg|png)$/,
+    errorMessage: 'Only image files are allowed (JPG, PNG)',
+};

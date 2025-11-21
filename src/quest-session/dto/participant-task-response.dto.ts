@@ -10,6 +10,9 @@ export class ParticipantQuizAnswerDto {
 }
 
 export class ParticipantQuizQuestionDto {
+    @ApiProperty({example: 1, description: 'Quiz question ID'})
+    quizQuestionId: number;
+
     @ApiProperty({example: 'What is the capital of Great Britain?'})
     question: string;
 
@@ -18,6 +21,9 @@ export class ParticipantQuizQuestionDto {
 
     @ApiProperty({example: 10, description: 'Points awarded for correct answer'})
     scorePointsCount: number;
+
+    @ApiProperty({example: false, description: 'Whether multiple answers can be selected (determined by having more than one correct answer)'})
+    isMultipleAnswer: boolean;
 
     @ApiProperty({
         type: [ParticipantQuizAnswerDto],
