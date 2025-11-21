@@ -1,5 +1,14 @@
-import {BadRequestException, Body, Controller, Get, Param, ParseIntPipe, Post, UploadedFile, UseGuards} from '@nestjs/common';
-import {Controller, Get, Param, ParseIntPipe, UseGuards} from '@nestjs/common';
+import {
+    BadRequestException,
+    Body,
+    Controller,
+    Get,
+    Param,
+    ParseIntPipe,
+    Post,
+    UploadedFile,
+    UseGuards
+} from '@nestjs/common';
 import {ApiBearerAuth, ApiTags} from '@nestjs/swagger';
 import {JwtAuthGuard} from '@/auth/jwt-auth.guard';
 import {GetUser} from '@/auth/decorators/get-user.decorator';
