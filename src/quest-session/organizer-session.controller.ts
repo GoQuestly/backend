@@ -1,25 +1,15 @@
-import {
-    Controller,
-    Get,
-    Post,
-    Put,
-    Body,
-    Param,
-    Query,
-    ParseIntPipe,
-    UseGuards,
-    ValidationPipe,
-} from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiExtraModels } from '@nestjs/swagger';
-import { JwtAuthGuard } from '@/auth/jwt-auth.guard';
-import { GetUser } from '@/auth/decorators/get-user.decorator';
-import { QuestSessionService } from './quest-session.service';
-import { LocationService } from './location.service';
-import { QuestSessionDto } from './dto/quest-session.dto';
-import { GetQuestSessionsQueryDto } from "@/quest-session/dto/get-quest-sessions-query.dto";
-import { QuestSessionResponseDto } from "@/quest-session/dto/quest-session-response.dto";
-import { PaginatedQuestSessionsResponseDto } from "@/quest-session/dto/paginated-quest-sessions-response.dto";
-import { ParticipantLocationDto } from "@/quest-session/dto/participant-location.dto";
+import {Body, Controller, Get, Param, ParseIntPipe, Post, Put, Query, UseGuards, ValidationPipe,} from '@nestjs/common';
+import {ApiBearerAuth, ApiExtraModels, ApiTags} from '@nestjs/swagger';
+import {JwtAuthGuard} from '@/auth/jwt-auth.guard';
+import {GetUser} from '@/auth/decorators/get-user.decorator';
+import {QuestSessionService} from './quest-session.service';
+import {LocationService} from './location.service';
+import {QuestSessionDto} from './dto/quest-session.dto';
+import {GetQuestSessionsQueryDto} from "@/quest-session/dto/get-quest-sessions-query.dto";
+import {QuestSessionResponseDto} from "@/quest-session/dto/quest-session-response.dto";
+import {PaginatedQuestSessionsResponseDto} from "@/quest-session/dto/paginated-quest-sessions-response.dto";
+import {ParticipantLocationDto} from "@/quest-session/dto/participant-location.dto";
+import {ParticipantScoresResponseDto} from "@/quest-session/dto/participant-scores-response.dto";
 
 @ApiTags('Organizer - Quest Sessions')
 @ApiBearerAuth()
@@ -77,6 +67,14 @@ export class OrganizerSessionController {
         @GetUser('userId') userId: number,
     ): Promise<QuestSessionResponseDto> {
         return this.sessionService.cancelSession(id, userId);
+    }
+
+    @Get('sessions/:id/scores')
+    async getParticipantScores(
+        @Param('id', ParseIntPipe) id: number,
+        @GetUser('userId') userId: number,
+    ): Promise<ParticipantScoresResponseDto> {
+        return this.sessionService.getParticipantScores(id, userId);
     }
 
     @Get('sessions/:id/locations/latest')
