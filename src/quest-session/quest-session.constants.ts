@@ -1,1 +1,0 @@
-export const PRE_SESSION_GRACE_PERIOD_MS = 15 * 60 * 1000;
