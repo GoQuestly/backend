@@ -513,4 +513,70 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
             console.error(`[notifyOrganizerPointPassed] Error:`, error.message);
         }
     }
+
+    async notifyTaskCompleted(
+        sessionId: number,
+        organizerUserId: number,
+        data: {
+            userId: number;
+            userName: string;
+            taskId: number;
+            pointName: string;
+            scoreEarned: number;
+            totalScore: number;
+            completedAt: Date;
+        }
+    ): Promise<void> {
+        try {
+            if (!sessionId || sessionId <= 0) {
+                return;
+            }
+
+            const taskCompletedEvent = {
+                ...data,
+                sessionId,
+            };
+
+            const organizerSockets = await this.server.in(`session-${sessionId}`).fetchSockets();
+
+            for (const socket of organizerSockets) {
+                const authSocket = socket as unknown as AuthenticatedSocket;
+                if (authSocket.userId === organizerUserId) {
+                    socket.emit('task-completed', taskCompletedEvent);
+                }
+            }
+
+            console.log(`[active-session:notify] Task completed by user ${data.userId} - notified organizer ${organizerUserId}`);
+        } catch (error) {
+            console.error('[active-session:notify] Error notifying organizer about task completion:', error.message);
+        }
+    }
+
+    async notifyScoresUpdated(
+        sessionId: number,
+        scores: {
+            userId: number;
+            userName: string;
+            totalScore: number;
+            completedTasksCount: number;
+        }[]
+    ): Promise<void> {
+        try {
+            if (!sessionId || sessionId <= 0) {
+                return;
+            }
+
+            const scoresUpdatedEvent = {
+                sessionId,
+                participants: scores,
+                updatedAt: new Date(),
+            };
+
+            this.server.to(`session-${sessionId}`).emit('scores-updated', scoresUpdatedEvent);
+
+            console.log(`[active-session:notify] Scores updated in session ${sessionId}`);
+        } catch (error) {
+            console.error('[active-session:notify] Error broadcasting scores update:', error.message);
+        }
+    }
 }
