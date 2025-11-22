@@ -1,8 +1,8 @@
 import { Injectable, BadRequestException, NotFoundException, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { QuestEntity } from '@/common/entities/QuestEntity';
-import { UserEntity } from '@/common/entities/UserEntity';
+import { QuestEntity } from '@/common/entities/quest.entity';
+import { UserEntity } from '@/common/entities/user.entity';
 import { CreateQuestDto } from './dto/create-quest.dto';
 import { UpdateQuestDto } from './dto/update-quest.dto';
 import { QuestResponseDto } from './dto/quest-response.dto';

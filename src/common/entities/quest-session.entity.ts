@@ -1,7 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany } from 'typeorm';
-import { QuestEntity } from './QuestEntity';
-import { ParticipantEntity } from './ParticipantEntity';
-import { QuestSessionEndReason } from "@/common/enums/QuestSessionEndReason";
+import { QuestEntity } from './quest.entity';
+import { ParticipantEntity } from './participant.entity';
+import { QuestSessionEndReason } from "@/common/enums/quest-session-end-reason";
 
 @Entity('quest_sessions')
 export class QuestSessionEntity {

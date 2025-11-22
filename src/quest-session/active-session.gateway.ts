@@ -4,15 +4,15 @@ import {LocationService} from './location.service';
 import {JwtService} from '@nestjs/jwt';
 import {InjectRepository} from '@nestjs/typeorm';
 import {Repository} from 'typeorm';
-import {QuestSessionEntity} from '@/common/entities/QuestSessionEntity';
-import {ParticipantStatus} from '@/common/enums/ParticipantStatus';
+import {QuestSessionEntity} from '@/common/entities/quest-session.entity';
+import {ParticipantStatus} from '@/common/enums/participant-status';
 import {UpdateLocationDto} from "@/quest-session/dto/update-location.dto";
-import {UserEntity} from '@/common/entities/UserEntity';
+import {UserEntity} from '@/common/entities/user.entity';
 import {AbstractSessionGateway} from './abstract-session.gateway';
 import {AuthenticatedSocket, ErrorResponse} from './gateway.types';
 import {forwardRef, Inject} from '@nestjs/common';
-import {QuestPointEntity} from '@/common/entities/QuestPointEntity';
-import {ParticipantPointEntity} from '@/common/entities/ParticipantPointEntity';
+import {QuestPointEntity} from '@/common/entities/quest-point.entity';
+import {ParticipantPointEntity} from '@/common/entities/participant-point.entity';
 import {calculateDistance, POINT_COMPLETION_RADIUS_METERS} from './participant-task.constants';
 import {isSessionActive} from '@/common/utils/session.util';
 
@@ -511,6 +511,72 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
             }
         } catch (error) {
             console.error(`[notifyOrganizerPointPassed] Error:`, error.message);
+        }
+    }
+
+    async notifyTaskCompleted(
+        sessionId: number,
+        organizerUserId: number,
+        data: {
+            userId: number;
+            userName: string;
+            taskId: number;
+            pointName: string;
+            scoreEarned: number;
+            totalScore: number;
+            completedAt: Date;
+        }
+    ): Promise<void> {
+        try {
+            if (!sessionId || sessionId <= 0) {
+                return;
+            }
+
+            const taskCompletedEvent = {
+                ...data,
+                sessionId,
+            };
+
+            const organizerSockets = await this.server.in(`session-${sessionId}`).fetchSockets();
+
+            for (const socket of organizerSockets) {
+                const authSocket = socket as unknown as AuthenticatedSocket;
+                if (authSocket.userId === organizerUserId) {
+                    socket.emit('task-completed', taskCompletedEvent);
+                }
+            }
+
+            console.log(`[active-session:notify] Task completed by user ${data.userId} - notified organizer ${organizerUserId}`);
+        } catch (error) {
+            console.error('[active-session:notify] Error notifying organizer about task completion:', error.message);
+        }
+    }
+
+    async notifyScoresUpdated(
+        sessionId: number,
+        scores: {
+            userId: number;
+            userName: string;
+            totalScore: number;
+            completedTasksCount: number;
+        }[]
+    ): Promise<void> {
+        try {
+            if (!sessionId || sessionId <= 0) {
+                return;
+            }
+
+            const scoresUpdatedEvent = {
+                sessionId,
+                participants: scores,
+                updatedAt: new Date(),
+            };
+
+            this.server.to(`session-${sessionId}`).emit('scores-updated', scoresUpdatedEvent);
+
+            console.log(`[active-session:notify] Scores updated in session ${sessionId}`);
+        } catch (error) {
+            console.error('[active-session:notify] Error broadcasting scores update:', error.message);
         }
     }
 }

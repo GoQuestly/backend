@@ -1,7 +1,7 @@
 import {Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, OneToOne, JoinColumn} from 'typeorm';
-import { QuestEntity } from './QuestEntity';
-import { QuestTaskEntity } from './QuestTaskEntity';
-import {ParticipantPointEntity} from "@/common/entities/ParticipantPointEntity";
+import { QuestEntity } from './quest.entity';
+import { QuestTaskEntity } from './quest-task.entity';
+import {ParticipantPointEntity} from "@/common/entities/participant-point.entity";
 
 @Entity('quest_points')
 export class QuestPointEntity {

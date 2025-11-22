@@ -7,11 +7,11 @@ import {
 } from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
 import {Repository} from 'typeorm';
-import {QuestTaskEntity} from '@/common/entities/QuestTaskEntity';
-import {QuizQuestionEntity} from '@/common/entities/QuizQuestionEntity';
-import {QuizAnswerEntity} from '@/common/entities/QuizAnswerEntity';
-import {QuestPointEntity} from '@/common/entities/QuestPointEntity';
-import {QuestTaskType} from '@/common/enums/QuestTaskType';
+import {QuestTaskEntity} from '@/common/entities/quest-task.entity';
+import {QuizQuestionEntity} from '@/common/entities/quiz-question.entity';
+import {QuizAnswerEntity} from '@/common/entities/quiz-answer.entity';
+import {QuestPointEntity} from '@/common/entities/quest-point.entity';
+import {QuestTaskType} from '@/common/enums/quest-task-type';
 import {
     CodeWordTaskResponseDto,
     CreateCodeWordTaskDto,

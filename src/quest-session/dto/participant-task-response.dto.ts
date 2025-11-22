@@ -1,5 +1,5 @@
 import {ApiProperty} from '@nestjs/swagger';
-import {QuestTaskType} from '@/common/enums/QuestTaskType';
+import {QuestTaskType} from '@/common/enums/quest-task-type';
 
 export class ParticipantQuizAnswerDto {
     @ApiProperty({example: 1, description: 'Quiz answer ID'})

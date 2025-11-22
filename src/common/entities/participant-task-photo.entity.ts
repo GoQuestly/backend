@@ -1,5 +1,5 @@
 import {Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn} from 'typeorm';
-import { ParticipantTaskEntity } from './ParticipantTaskEntity';
+import { ParticipantTaskEntity } from './participant-task.entity';
 
 @Entity('participant_task_photos')
 export class ParticipantTaskPhotoEntity {

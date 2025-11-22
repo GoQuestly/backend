@@ -9,10 +9,10 @@ import {
 import {InjectRepository} from '@nestjs/typeorm';
 import {Repository} from 'typeorm';
 import * as bcrypt from 'bcrypt';
-import {UserEntity} from '@/common/entities/UserEntity';
-import {RegisterDto} from './dto/RegisterDto';
+import {UserEntity} from '@/common/entities/user.entity';
+import {RegisterDto} from './dto/register.dto';
 import {JwtService} from '@nestjs/jwt';
-import {LoginDto} from "@/auth/dto/LoginDto";
+import {LoginDto} from "@/auth/dto/login.dto";
 import {RequestPasswordResetDto, ResetPasswordDto} from './dto/reset-password.dto';
 import {EmailService} from '@/email/email.service';
 import {generatePasswordResetEmailTemplate} from '@/email/templates/password-reset.template';

@@ -2,10 +2,10 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { QuestTaskController } from './quest-task.controller';
 import { QuestTaskService } from './quest-task.service';
-import { QuestTaskEntity } from '@/common/entities/QuestTaskEntity';
-import { QuizQuestionEntity } from '@/common/entities/QuizQuestionEntity';
-import { QuizAnswerEntity } from '@/common/entities/QuizAnswerEntity';
-import {QuestPointEntity} from "@/common/entities/QuestPointEntity";
+import { QuestTaskEntity } from '@/common/entities/quest-task.entity';
+import { QuizQuestionEntity } from '@/common/entities/quiz-question.entity';
+import { QuizAnswerEntity } from '@/common/entities/quiz-answer.entity';
+import {QuestPointEntity} from "@/common/entities/quest-point.entity";
 
 @Module({
     imports: [

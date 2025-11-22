@@ -7,9 +7,9 @@ import {
     CreateDateColumn,
     UpdateDateColumn
 } from 'typeorm';
-import { QuestPointEntity } from './QuestPointEntity';
-import { QuestSessionEntity } from './QuestSessionEntity';
-import { UserEntity } from './UserEntity';
+import { QuestPointEntity } from './quest-point.entity';
+import { QuestSessionEntity } from './quest-session.entity';
+import { UserEntity } from './user.entity';
 
 @Entity('quests')
 export class QuestEntity {

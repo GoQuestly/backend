@@ -1,6 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { ParticipantStatus } from "@/common/enums/ParticipantStatus";
-import { RejectionReason } from "@/common/enums/RejectionReason";
+import { ParticipantStatus } from "@/common/enums/participant-status";
+import { RejectionReason } from "@/common/enums/rejection-reason";
 
 export class ParticipantResponseDto {
     @ApiProperty({

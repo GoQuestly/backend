@@ -14,12 +14,12 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { RegisterDto } from './dto/RegisterDto';
-import { LoginDto } from "@/auth/dto/LoginDto";
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from "@/auth/dto/login.dto";
 import { RequestPasswordResetDto, ResetPasswordDto, VerifyResetTokenDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/email-verification.dto';
 import { GoogleAuthService } from './google.service';
-import {GoogleLoginDto} from './dto/GoogleLoginDto';
+import {GoogleLoginDto} from './dto/google-login.dto';
 import { Response } from 'express';
 import {JwtAuthGuard} from "@/auth/jwt-auth.guard";
 

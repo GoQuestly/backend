@@ -1,11 +1,11 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, CreateDateColumn, JoinColumn } from 'typeorm';
-import { UserEntity } from './UserEntity';
-import { QuestSessionEntity } from './QuestSessionEntity';
-import { ParticipantLocationEntity } from './ParticipantLocationEntity';
-import { ParticipantTaskEntity } from './ParticipantTaskEntity';
-import { ParticipantPointEntity } from './ParticipantPointEntity';
-import { ParticipantStatus } from '@/common/enums/ParticipantStatus';
-import { RejectionReason } from '@/common/enums/RejectionReason';
+import { UserEntity } from './user.entity';
+import { QuestSessionEntity } from './quest-session.entity';
+import { ParticipantLocationEntity } from './participant-location.entity';
+import { ParticipantTaskEntity } from './participant-task.entity';
+import { ParticipantPointEntity } from './participant-point.entity';
+import { ParticipantStatus } from '@/common/enums/participant-status';
+import { RejectionReason } from '@/common/enums/rejection-reason';
 
 @Entity('participants')
 export class ParticipantEntity {

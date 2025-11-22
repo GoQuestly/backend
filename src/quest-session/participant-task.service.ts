@@ -1,14 +1,14 @@
-import {BadRequestException, ForbiddenException, Injectable, NotFoundException} from '@nestjs/common';
+import {BadRequestException, ForbiddenException, forwardRef, Inject, Injectable, NotFoundException} from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
 import {Repository} from 'typeorm';
-import {QuestSessionEntity} from '@/common/entities/QuestSessionEntity';
-import {QuestPointEntity} from '@/common/entities/QuestPointEntity';
-import {QuestTaskEntity} from '@/common/entities/QuestTaskEntity';
-import {ParticipantTaskEntity} from '@/common/entities/ParticipantTaskEntity';
-import {QuizAnswerEntity} from '@/common/entities/QuizAnswerEntity';
-import {ParticipantTaskQuizAnswerEntity} from '@/common/entities/ParticipantTaskQuizAnswerEntity';
-import {ParticipantTaskPhotoEntity} from '@/common/entities/ParticipantTaskPhotoEntity';
-import {QuestTaskType} from '@/common/enums/QuestTaskType';
+import {QuestSessionEntity} from '@/common/entities/quest-session.entity';
+import {QuestPointEntity} from '@/common/entities/quest-point.entity';
+import {QuestTaskEntity} from '@/common/entities/quest-task.entity';
+import {ParticipantTaskEntity} from '@/common/entities/participant-task.entity';
+import {QuizAnswerEntity} from '@/common/entities/quiz-answer.entity';
+import {ParticipantTaskQuizAnswerEntity} from '@/common/entities/participant-task-quiz-answer.entity';
+import {ParticipantTaskPhotoEntity} from '@/common/entities/participant-task-photo.entity';
+import {QuestTaskType} from '@/common/enums/quest-task-type';
 import {
     ParticipantCodeWordTaskResponseDto,
     ParticipantPhotoTaskResponseDto,
@@ -23,6 +23,8 @@ import {
     TaskCompletionResponseDto
 } from './dto/submit-task.dto';
 import {isSessionActive} from '@/common/utils/session.util';
+import {ActiveSessionGateway} from './active-session.gateway';
+import {ParticipantStatus} from '@/common/enums/participant-status';
 
 @Injectable()
 export class ParticipantTaskService {
@@ -39,6 +41,8 @@ export class ParticipantTaskService {
         private participantTaskQuizAnswerRepository: Repository<ParticipantTaskQuizAnswerEntity>,
         @InjectRepository(ParticipantTaskPhotoEntity)
         private participantTaskPhotoRepository: Repository<ParticipantTaskPhotoEntity>,
+        @Inject(forwardRef(() => ActiveSessionGateway))
+        private activeSessionGateway: ActiveSessionGateway,
     ) {
     }
 
@@ -175,7 +179,7 @@ export class ParticipantTaskService {
         userId: number,
         dto: SubmitQuizAnswerDto
     ): Promise<QuizAnswerResponseDto | TaskCompletionResponseDto> {
-        const {task, participantTask} = await this.validateTaskSubmission(sessionId, pointId, userId, QuestTaskType.QUIZ);
+        const {task, participantTask, point, userName} = await this.validateTaskSubmission(sessionId, pointId, userId, QuestTaskType.QUIZ);
 
         const question = task.quizQuestions?.find(q => q.quizQuestionId === dto.questionId);
         if (!question) {
@@ -273,6 +277,16 @@ export class ParticipantTaskService {
 
             const passed = (scoreEarned / task.maxScorePointsCount) * 100 >= task.successScorePointsPercent;
 
+            await this.sendTaskCompletionNotifications(
+                sessionId,
+                userId,
+                userName,
+                task.questTaskId,
+                point.name,
+                scoreEarned,
+                completedDate
+            );
+
             return {
                 success: true,
                 scoreEarned,
@@ -297,7 +311,7 @@ export class ParticipantTaskService {
         userId: number,
         dto: SubmitCodeWordTaskDto
     ): Promise<TaskCompletionResponseDto> {
-        const {task, participantTask} = await this.validateTaskSubmission(sessionId, pointId, userId, QuestTaskType.CODE_WORD);
+        const {task, participantTask, point, userName} = await this.validateTaskSubmission(sessionId, pointId, userId, QuestTaskType.CODE_WORD);
 
         const isCorrect = task.codeWord.trim().toLowerCase() === dto.codeWord.trim().toLowerCase();
         const scoreEarned = isCorrect ? task.maxScorePointsCount : 0;
@@ -316,6 +330,16 @@ export class ParticipantTaskService {
         participantTask.scoreEarned = scoreEarned;
         participantTask.completedDate = completedDate;
 
+        await this.sendTaskCompletionNotifications(
+            sessionId,
+            userId,
+            userName,
+            task.questTaskId,
+            point.name,
+            scoreEarned,
+            completedDate
+        );
+
         return {
             success: true,
             scoreEarned,
@@ -331,7 +355,7 @@ export class ParticipantTaskService {
         userId: number,
         photoUrl: string
     ): Promise<TaskCompletionResponseDto> {
-        const {task, participantTask} = await this.validateTaskSubmission(sessionId, pointId, userId, QuestTaskType.PHOTO);
+        const {task, participantTask, point, userName} = await this.validateTaskSubmission(sessionId, pointId, userId, QuestTaskType.PHOTO);
 
         const photo = this.participantTaskPhotoRepository.create({
             participantTask,
@@ -352,6 +376,16 @@ export class ParticipantTaskService {
 
         participantTask.scoreEarned = task.maxScorePointsCount;
         participantTask.completedDate = completedDate;
+
+        await this.sendTaskCompletionNotifications(
+            sessionId,
+            userId,
+            userName,
+            task.questTaskId,
+            point.name,
+            task.maxScorePointsCount,
+            completedDate
+        );
 
         return {
             success: true,
@@ -439,7 +473,7 @@ export class ParticipantTaskService {
         pointId: number,
         userId: number,
         expectedTaskType: QuestTaskType
-    ): Promise<{ task: QuestTaskEntity; participantTask: ParticipantTaskEntity; point: QuestPointEntity }> {
+    ): Promise<{ task: QuestTaskEntity; participantTask: ParticipantTaskEntity; point: QuestPointEntity; userName: string }> {
         const {session, participant} = await this.getSessionWithParticipant(sessionId, userId);
         const point = await this.getPointWithTask(pointId, session.quest.questId);
 
@@ -472,6 +506,68 @@ export class ParticipantTaskService {
             throw new BadRequestException('Task time has expired');
         }
 
-        return {task: point.task, participantTask, point};
+        return {task: point.task, participantTask, point, userName: participant.user.name};
+    }
+
+    private async sendTaskCompletionNotifications(
+        sessionId: number,
+        userId: number,
+        userName: string,
+        taskId: number,
+        pointName: string,
+        scoreEarned: number,
+        completedAt: Date
+    ): Promise<void> {
+        try {
+            const session = await this.sessionRepository.findOne({
+                where: { questSessionId: sessionId },
+                relations: [
+                    'quest',
+                    'quest.organizer',
+                    'participants',
+                    'participants.user',
+                    'participants.tasks',
+                ],
+            });
+
+            if (!session) {
+                return;
+            }
+
+            const organizerUserId = session.quest.organizer.userId;
+            const currentParticipant = session.participants.find(p => p.user.userId === userId);
+            const totalScore = currentParticipant?.tasks
+                ?.filter(t => t.completedDate !== null)
+                .reduce((sum, t) => sum + (t.scoreEarned || 0), 0) || 0;
+
+            await this.activeSessionGateway.notifyTaskCompleted(sessionId, organizerUserId, {
+                userId,
+                userName,
+                taskId,
+                pointName,
+                scoreEarned,
+                totalScore,
+                completedAt,
+            });
+
+            if (scoreEarned > 0) {
+                const participantScores = session.participants
+                    .filter(p => p.participationStatus === ParticipantStatus.APPROVED)
+                    .map(p => {
+                        const completedTasks = p.tasks?.filter(t => t.completedDate !== null) || [];
+                        return {
+                            userId: p.user.userId,
+                            userName: p.user.name,
+                            totalScore: completedTasks.reduce((sum, t) => sum + (t.scoreEarned || 0), 0),
+                            completedTasksCount: completedTasks.length,
+                        };
+                    })
+                    .sort((a, b) => b.totalScore - a.totalScore);
+
+                await this.activeSessionGateway.notifyScoresUpdated(sessionId, participantScores);
+            }
+        } catch (error) {
+            console.error('[ParticipantTaskService] Error sending task completion notifications:', error.message);
+        }
     }
 }
