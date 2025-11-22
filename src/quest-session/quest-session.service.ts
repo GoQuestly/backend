@@ -490,6 +490,56 @@ export class QuestSessionService {
         });
     }
 
+    async getParticipantScores(sessionId: number, userId: number) {
+        const session = await this.sessionRepository.findOne({
+            where: {questSessionId: sessionId},
+            relations: [
+                'quest',
+                'quest.organizer',
+                'quest.points',
+                'quest.points.task',
+                'participants',
+                'participants.user',
+                'participants.tasks',
+            ],
+        });
+
+        if (!session) {
+            throw new NotFoundException(`Session with ID ${sessionId} not found`);
+        }
+
+        const isOrganizer = session.quest.organizer.userId === userId;
+        const isParticipant = session.participants.some(p => p.user.userId === userId);
+
+        if (!isOrganizer && !isParticipant) {
+            throw new ForbiddenException('You do not have access to this session');
+        }
+
+        const totalTasksInQuest = session.quest.points.filter(p => p.task !== null).length;
+
+        const participants = session.participants
+            .filter(p => p.participationStatus === ParticipantStatus.APPROVED)
+            .map(participant => {
+                const completedTasks = participant.tasks?.filter(t => t.completedDate !== null) || [];
+                const totalScore = completedTasks.reduce((sum, task) => sum + (task.scoreEarned || 0), 0);
+
+                return {
+                    participantId: participant.participantId,
+                    userId: participant.user.userId,
+                    userName: participant.user.name,
+                    photoUrl: getAbsoluteUrl(this.request, participant.user.photoUrl),
+                    totalScore,
+                    completedTasksCount: completedTasks.length,
+                };
+            })
+            .sort((a, b) => b.totalScore - a.totalScore);
+
+        return {
+            participants,
+            totalTasksInQuest,
+        };
+    }
+
     private mapToResponseDto(session: QuestSessionEntity, participant?: ParticipantEntity): QuestSessionResponseDto {
         const questPoints = session.quest.points || [];
         const questPointCount = questPoints.length;
