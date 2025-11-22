@@ -4,7 +4,7 @@ import {JwtModule} from '@nestjs/jwt';
 import {MulterModule} from '@nestjs/platform-express';
 import {UserController} from './user.controller';
 import {UserService} from './user.service';
-import {UserEntity} from '@/common/entities/UserEntity';
+import {UserEntity} from '@/common/entities/user.entity';
 
 @Module({
     imports: [

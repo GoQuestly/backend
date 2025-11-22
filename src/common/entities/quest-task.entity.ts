@@ -1,8 +1,8 @@
 import {Entity, PrimaryGeneratedColumn, Column, OneToMany, OneToOne} from 'typeorm';
-import { QuestPointEntity } from './QuestPointEntity';
-import { QuizQuestionEntity } from './QuizQuestionEntity';
-import { ParticipantTaskEntity } from './ParticipantTaskEntity';
-import { QuestTaskType } from "@/common/enums/QuestTaskType";
+import { QuestPointEntity } from './quest-point.entity';
+import { QuizQuestionEntity } from './quiz-question.entity';
+import { ParticipantTaskEntity } from './participant-task.entity';
+import { QuestTaskType } from "@/common/enums/quest-task-type";
 
 @Entity('quest_tasks')
 export class QuestTaskEntity {

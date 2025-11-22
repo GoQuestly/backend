@@ -1,6 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
-import { ParticipantEntity } from './ParticipantEntity';
-import { QuestPointEntity } from './QuestPointEntity';
+import { ParticipantEntity } from './participant.entity';
+import { QuestPointEntity } from './quest-point.entity';
 
 @Entity('participant_points')
 export class ParticipantPointEntity {

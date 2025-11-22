@@ -1,7 +1,7 @@
 import {Injectable, NotFoundException, BadRequestException, Inject} from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
 import {Repository} from 'typeorm';
-import {UserEntity} from '@/common/entities/UserEntity';
+import {UserEntity} from '@/common/entities/user.entity';
 import {UpdateProfileDto} from './dto/update-profile.dto';
 import {UserDto} from "@/common/dto/user.dto";
 import {REQUEST} from '@nestjs/core';

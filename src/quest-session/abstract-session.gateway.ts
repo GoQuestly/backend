@@ -2,9 +2,9 @@ import {OnGatewayConnection, OnGatewayDisconnect} from '@nestjs/websockets';
 import {Server} from 'socket.io';
 import {JwtService} from '@nestjs/jwt';
 import {Repository} from 'typeorm';
-import {QuestSessionEntity} from '@/common/entities/QuestSessionEntity';
-import {ParticipantEntity} from '@/common/entities/ParticipantEntity';
-import {UserEntity} from '@/common/entities/UserEntity';
+import {QuestSessionEntity} from '@/common/entities/quest-session.entity';
+import {ParticipantEntity} from '@/common/entities/participant.entity';
+import {UserEntity} from '@/common/entities/user.entity';
 import {AuthenticatedSocket, ErrorResponse} from './gateway.types';
 
 export abstract class AbstractSessionGateway implements OnGatewayConnection, OnGatewayDisconnect {

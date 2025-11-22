@@ -9,11 +9,11 @@ import {
 import {InjectRepository} from '@nestjs/typeorm';
 import {Repository} from 'typeorm';
 import * as polyline from '@mapbox/polyline';
-import {ParticipantLocationEntity} from '@/common/entities/ParticipantLocationEntity';
-import {ParticipantEntity} from '@/common/entities/ParticipantEntity';
-import {QuestSessionEntity} from '@/common/entities/QuestSessionEntity';
-import {ParticipantStatus} from '@/common/enums/ParticipantStatus';
-import {RejectionReason} from '@/common/enums/RejectionReason';
+import {ParticipantLocationEntity} from '@/common/entities/participant-location.entity';
+import {ParticipantEntity} from '@/common/entities/participant.entity';
+import {QuestSessionEntity} from '@/common/entities/quest-session.entity';
+import {ParticipantStatus} from '@/common/enums/participant-status';
+import {RejectionReason} from '@/common/enums/rejection-reason';
 import {UpdateLocationDto} from "@/quest-session/dto/update-location.dto";
 import {ParticipantLocationDto} from "@/quest-session/dto/participant-location.dto";
 import {LocationHistoryResponseDto} from "@/quest-session/dto/location-history-response.dto";

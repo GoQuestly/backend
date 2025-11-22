@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { QuestSessionEndReason } from "@/common/enums/QuestSessionEndReason";
+import { QuestSessionEndReason } from "@/common/enums/quest-session-end-reason";
 import { ParticipantResponseDto } from "@/quest-session/dto/participant-response.dto";
 
 export class QuestSessionResponseDto {

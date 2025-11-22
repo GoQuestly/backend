@@ -4,7 +4,7 @@ import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { UserEntity } from '@/common/entities/UserEntity';
+import { UserEntity } from '@/common/entities/user.entity';
 import { JwtStrategy } from './jwt.strategy';
 import { GoogleAuthService } from "@/auth/google.service";
 import {EmailModule} from "@/email/email.module";

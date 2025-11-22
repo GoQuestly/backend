@@ -9,9 +9,9 @@ import { Server } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { QuestSessionEntity } from '@/common/entities/QuestSessionEntity';
-import { ParticipantEntity } from '@/common/entities/ParticipantEntity';
-import { ParticipantStatus } from '@/common/enums/ParticipantStatus';
+import { QuestSessionEntity } from '@/common/entities/quest-session.entity';
+import { ParticipantEntity } from '@/common/entities/participant.entity';
+import { ParticipantStatus } from '@/common/enums/participant-status';
 import { AbstractSessionGateway } from './abstract-session.gateway';
 import { AuthenticatedSocket, ErrorResponse } from './gateway.types';
 

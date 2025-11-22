@@ -1,10 +1,10 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { QuestPointEntity } from '@/common/entities/QuestPointEntity';
-import { QuestEntity } from '@/common/entities/QuestEntity';
-import { QuestTaskEntity } from '@/common/entities/QuestTaskEntity';
-import { QuestTaskType } from '@/common/enums/QuestTaskType';
+import { QuestPointEntity } from '@/common/entities/quest-point.entity';
+import { QuestEntity } from '@/common/entities/quest.entity';
+import { QuestTaskEntity } from '@/common/entities/quest-task.entity';
+import { QuestTaskType } from '@/common/enums/quest-task-type';
 import { CreateQuestPointDto } from './dto/create-quest-point.dto';
 import { UpdateQuestPointDto } from './dto/update-quest-point.dto';
 import { QuestPointResponseDto } from './dto/quest-point-response.dto';

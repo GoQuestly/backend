@@ -1,4 +1,4 @@
-import {QuestSessionEntity} from '@/common/entities/QuestSessionEntity';
+import {QuestSessionEntity} from '@/common/entities/quest-session.entity';
 
 export function isSessionActive(session: QuestSessionEntity): boolean {
     const now = new Date();

@@ -3,7 +3,7 @@ import {OAuth2Client} from 'google-auth-library';
 import {InjectRepository} from '@nestjs/typeorm';
 import {Repository} from 'typeorm';
 import {JwtService} from '@nestjs/jwt';
-import {UserEntity} from '@/common/entities/UserEntity';
+import {UserEntity} from '@/common/entities/user.entity';
 
 @Injectable()
 export class GoogleAuthService {

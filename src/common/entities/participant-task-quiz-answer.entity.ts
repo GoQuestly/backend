@@ -1,6 +1,6 @@
 import {Entity, PrimaryGeneratedColumn, ManyToOne, Column} from 'typeorm';
-import { ParticipantTaskEntity } from './ParticipantTaskEntity';
-import { QuizAnswerEntity } from './QuizAnswerEntity';
+import { ParticipantTaskEntity } from './participant-task.entity';
+import { QuizAnswerEntity } from './quiz-answer.entity';
 
 @Entity('participant_task_quiz_answers')
 export class ParticipantTaskQuizAnswerEntity {

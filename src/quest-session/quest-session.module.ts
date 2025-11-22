@@ -11,19 +11,19 @@ import {ParticipantTaskService} from './participant-task.service'; // NEW
 import {ActiveSessionGateway} from './active-session.gateway';
 import {SessionEventsGateway} from './session-events.gateway';
 import {SessionEndValidatorService} from './session-end-validator.service';
-import {QuestSessionEntity} from '@/common/entities/QuestSessionEntity';
-import {ParticipantEntity} from '@/common/entities/ParticipantEntity';
-import {ParticipantLocationEntity} from '@/common/entities/ParticipantLocationEntity';
-import {ParticipantPointEntity} from '@/common/entities/ParticipantPointEntity'; // NEW
-import {QuestEntity} from '@/common/entities/QuestEntity';
-import {UserEntity} from '@/common/entities/UserEntity';
-import {QuestPointEntity} from '@/common/entities/QuestPointEntity'; // NEW
-import {QuestTaskEntity} from '@/common/entities/QuestTaskEntity'; // NEW
-import {ParticipantTaskEntity} from '@/common/entities/ParticipantTaskEntity'; // NEW
-import {QuizQuestionEntity} from '@/common/entities/QuizQuestionEntity';
-import {QuizAnswerEntity} from '@/common/entities/QuizAnswerEntity';
-import {ParticipantTaskQuizAnswerEntity} from '@/common/entities/ParticipantTaskQuizAnswerEntity';
-import {ParticipantTaskPhotoEntity} from '@/common/entities/ParticipantTaskPhotoEntity';
+import {QuestSessionEntity} from '@/common/entities/quest-session.entity';
+import {ParticipantEntity} from '@/common/entities/participant.entity';
+import {ParticipantLocationEntity} from '@/common/entities/participant-location.entity';
+import {ParticipantPointEntity} from '@/common/entities/participant-point.entity'; // NEW
+import {QuestEntity} from '@/common/entities/quest.entity';
+import {UserEntity} from '@/common/entities/user.entity';
+import {QuestPointEntity} from '@/common/entities/quest-point.entity'; // NEW
+import {QuestTaskEntity} from '@/common/entities/quest-task.entity'; // NEW
+import {ParticipantTaskEntity} from '@/common/entities/participant-task.entity'; // NEW
+import {QuizQuestionEntity} from '@/common/entities/quiz-question.entity';
+import {QuizAnswerEntity} from '@/common/entities/quiz-answer.entity';
+import {ParticipantTaskQuizAnswerEntity} from '@/common/entities/participant-task-quiz-answer.entity';
+import {ParticipantTaskPhotoEntity} from '@/common/entities/participant-task-photo.entity';
 import {EmailModule} from '@/email/email.module';
 
 @Module({

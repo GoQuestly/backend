@@ -1,7 +1,7 @@
 import {ArrayMinSize, IsArray, IsBoolean, IsInt, IsNotEmpty, IsString, Max, Min, ValidateNested} from 'class-validator';
 import {Type} from 'class-transformer';
 import {ApiProperty} from '@nestjs/swagger';
-import {QuestTaskType} from '@/common/enums/QuestTaskType';
+import {QuestTaskType} from '@/common/enums/quest-task-type';
 import {MAX_TASK_DURATION_SECONDS} from "@/quest-task/quest-task.constants";
 
 export class QuizAnswerDto {

@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { ParticipantStatus } from "@/common/enums/ParticipantStatus";
+import { ParticipantStatus } from "@/common/enums/participant-status";
 
 export class ParticipantValidationDto {
     @ApiProperty({

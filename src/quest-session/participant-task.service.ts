@@ -1,14 +1,14 @@
 import {BadRequestException, ForbiddenException, Injectable, NotFoundException} from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
 import {Repository} from 'typeorm';
-import {QuestSessionEntity} from '@/common/entities/QuestSessionEntity';
-import {QuestPointEntity} from '@/common/entities/QuestPointEntity';
-import {QuestTaskEntity} from '@/common/entities/QuestTaskEntity';
-import {ParticipantTaskEntity} from '@/common/entities/ParticipantTaskEntity';
-import {QuizAnswerEntity} from '@/common/entities/QuizAnswerEntity';
-import {ParticipantTaskQuizAnswerEntity} from '@/common/entities/ParticipantTaskQuizAnswerEntity';
-import {ParticipantTaskPhotoEntity} from '@/common/entities/ParticipantTaskPhotoEntity';
-import {QuestTaskType} from '@/common/enums/QuestTaskType';
+import {QuestSessionEntity} from '@/common/entities/quest-session.entity';
+import {QuestPointEntity} from '@/common/entities/quest-point.entity';
+import {QuestTaskEntity} from '@/common/entities/quest-task.entity';
+import {ParticipantTaskEntity} from '@/common/entities/participant-task.entity';
+import {QuizAnswerEntity} from '@/common/entities/quiz-answer.entity';
+import {ParticipantTaskQuizAnswerEntity} from '@/common/entities/participant-task-quiz-answer.entity';
+import {ParticipantTaskPhotoEntity} from '@/common/entities/participant-task-photo.entity';
+import {QuestTaskType} from '@/common/enums/quest-task-type';
 import {
     ParticipantCodeWordTaskResponseDto,
     ParticipantPhotoTaskResponseDto,

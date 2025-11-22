@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
-import { ParticipantEntity } from './ParticipantEntity';
+import { ParticipantEntity } from './participant.entity';
 
 @Entity('participant_locations')
 export class ParticipantLocationEntity {

@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { QuestPointEntity } from '@/common/entities/QuestPointEntity';
-import { QuestEntity } from '@/common/entities/QuestEntity';
-import { QuestSessionEntity } from '@/common/entities/QuestSessionEntity';
+import { QuestPointEntity } from '@/common/entities/quest-point.entity';
+import { QuestEntity } from '@/common/entities/quest.entity';
+import { QuestSessionEntity } from '@/common/entities/quest-session.entity';
 import { QuestPointService } from './quest-point.service';
 import { QuestPointController } from './quest-point.controller';
 import { QuestSessionModule } from "@/quest-session/quest-session.module";

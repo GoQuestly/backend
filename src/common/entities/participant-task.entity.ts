@@ -1,8 +1,8 @@
 import {Entity, PrimaryGeneratedColumn, ManyToOne, OneToOne, Column, OneToMany} from 'typeorm';
-import { ParticipantEntity } from './ParticipantEntity';
-import { QuestTaskEntity } from './QuestTaskEntity';
-import { ParticipantTaskPhotoEntity } from './ParticipantTaskPhotoEntity';
-import {ParticipantTaskQuizAnswerEntity} from "@/common/entities/ParticipantTaskQuizAnswerEntity";
+import { ParticipantEntity } from './participant.entity';
+import { QuestTaskEntity } from './quest-task.entity';
+import { ParticipantTaskPhotoEntity } from './participant-task-photo.entity';
+import {ParticipantTaskQuizAnswerEntity} from "@/common/entities/participant-task-quiz-answer.entity";
 
 @Entity('participant_tasks')
 export class ParticipantTaskEntity {
