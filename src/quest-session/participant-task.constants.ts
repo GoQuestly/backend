@@ -1,4 +1,4 @@
-export const POINT_COMPLETION_RADIUS_METERS = 20;
+export const POINT_COMPLETION_RADIUS_METERS = 30;
 
 export function calculateDistance(
     lat1: number,

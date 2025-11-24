@@ -12,8 +12,8 @@ export class ParticipantTaskPhotoEntity {
     @Column({ name: "upload_date" })
     uploadDate: Date;
 
-    @Column({ name: "is_approved" })
-    isApproved: boolean;
+    @Column({ name: "is_approved", nullable: true })
+    isApproved: boolean | null;
 
     @OneToOne(() => ParticipantTaskEntity, (pt) => pt.photo)
     @JoinColumn({ name: "participant_task_id" })

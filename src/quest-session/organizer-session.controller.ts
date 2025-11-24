@@ -10,6 +10,8 @@ import {QuestSessionResponseDto} from "@/quest-session/dto/quest-session-respons
 import {PaginatedQuestSessionsResponseDto} from "@/quest-session/dto/paginated-quest-sessions-response.dto";
 import {ParticipantLocationDto} from "@/quest-session/dto/participant-location.dto";
 import {ParticipantScoresResponseDto} from "@/quest-session/dto/participant-scores-response.dto";
+import {ParticipantTaskService} from './participant-task.service';
+import {PendingPhotoDto, PhotoModerationActionDto, PhotoModerationResponseDto} from './dto/photo-moderation.dto';
 
 @ApiTags('Organizer - Quest Sessions')
 @ApiBearerAuth()
@@ -20,6 +22,7 @@ export class OrganizerSessionController {
     constructor(
         private readonly sessionService: QuestSessionService,
         private readonly locationService: LocationService,
+        private readonly participantTaskService: ParticipantTaskService,
     ) {}
 
     @Post('quest/:questId/sessions')
@@ -83,5 +86,23 @@ export class OrganizerSessionController {
         @GetUser('userId') userId: number,
     ): Promise<ParticipantLocationDto[]> {
         return this.locationService.getLatestLocations(id, userId);
+    }
+
+    @Get('sessions/:id/photos/pending')
+    async getPendingPhotos(
+        @Param('id', ParseIntPipe) id: number,
+        @GetUser('userId') userId: number,
+    ): Promise<PendingPhotoDto[]> {
+        return this.participantTaskService.getPendingPhotos(id, userId);
+    }
+
+    @Post('sessions/:sessionId/photos/:photoId/moderate')
+    async moderatePhoto(
+        @Param('sessionId', ParseIntPipe) sessionId: number,
+        @Param('photoId', ParseIntPipe) photoId: number,
+        @Body() dto: PhotoModerationActionDto,
+        @GetUser('userId') userId: number,
+    ): Promise<PhotoModerationResponseDto> {
+        return this.participantTaskService.moderatePhoto(sessionId, photoId, userId, dto);
     }
 }
