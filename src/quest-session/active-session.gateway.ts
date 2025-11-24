@@ -579,4 +579,94 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
             console.error('[active-session:notify] Error broadcasting scores update:', error.message);
         }
     }
+
+    async notifyPhotoSubmitted(
+        sessionId: number,
+        organizerUserId: number,
+        data: {
+            participantTaskPhotoId: number;
+            participantTaskId: number;
+            userId: number;
+            userName: string;
+            questTaskId: number;
+            taskDescription: string;
+            pointName: string;
+            photoUrl: string;
+            uploadDate: Date;
+        }
+    ): Promise<void> {
+        try {
+            if (!sessionId || sessionId <= 0) {
+                return;
+            }
+
+            const photoSubmittedEvent = {
+                ...data,
+                sessionId,
+            };
+
+            const organizerSockets = await this.server.in(`session-${sessionId}`).fetchSockets();
+
+            for (const socket of organizerSockets) {
+                const authSocket = socket as unknown as AuthenticatedSocket;
+                if (authSocket.userId === organizerUserId) {
+                    socket.emit('photo-submitted', photoSubmittedEvent);
+                }
+            }
+
+            console.log(`[active-session:notify] Photo submitted by user ${data.userId} in session ${sessionId}`);
+        } catch (error) {
+            console.error('[active-session:notify] Error notifying organizer about photo submission:', error.message);
+        }
+    }
+
+    async notifyPhotoModerated(
+        sessionId: number,
+        organizerUserId: number,
+        participantUserId: number,
+        data: {
+            participantTaskPhotoId: number;
+            participantTaskId: number;
+            userId: number;
+            userName: string;
+            questTaskId: number;
+            taskDescription: string;
+            pointName: string;
+            photoUrl: string;
+            approved: boolean;
+            rejectionReason?: string;
+            scoreAdjustment: number;
+            totalScore: number;
+        }
+    ): Promise<void> {
+        try {
+            if (!sessionId || sessionId <= 0) {
+                return;
+            }
+
+            const photoModeratedEvent = {
+                ...data,
+                sessionId,
+                moderatedAt: new Date(),
+            };
+
+            const allSockets = await this.server.in(`session-${sessionId}`).fetchSockets();
+
+            for (const socket of allSockets) {
+                const authSocket = socket as unknown as AuthenticatedSocket;
+
+                if (authSocket.userId === participantUserId) {
+                    socket.emit('photo-moderated', photoModeratedEvent);
+                }
+
+                if (authSocket.userId === organizerUserId) {
+                    socket.emit('photo-moderated', photoModeratedEvent);
+                }
+            }
+
+            console.log(`[active-session:notify] Photo ${data.approved ? 'approved' : 'rejected'} for user ${participantUserId} in session ${sessionId}`);
+        } catch (error) {
+            console.error('[active-session:notify] Error notifying about photo moderation:', error.message);
+        }
+    }
 }

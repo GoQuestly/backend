@@ -1,6 +1,13 @@
-import {BadRequestException, ForbiddenException, forwardRef, Inject, Injectable, NotFoundException} from '@nestjs/common';
+import {
+    BadRequestException,
+    ForbiddenException,
+    forwardRef,
+    Inject,
+    Injectable,
+    NotFoundException
+} from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
-import {Repository} from 'typeorm';
+import {Repository, Not, IsNull} from 'typeorm';
 import {QuestSessionEntity} from '@/common/entities/quest-session.entity';
 import {QuestPointEntity} from '@/common/entities/quest-point.entity';
 import {QuestTaskEntity} from '@/common/entities/quest-task.entity';
@@ -25,6 +32,8 @@ import {
 import {isSessionActive} from '@/common/utils/session.util';
 import {ActiveSessionGateway} from './active-session.gateway';
 import {ParticipantStatus} from '@/common/enums/participant-status';
+import {PendingPhotoDto, PhotoModerationActionDto, PhotoModerationResponseDto} from './dto/photo-moderation.dto';
+import {ParticipantEntity} from '@/common/entities/participant.entity';
 
 @Injectable()
 export class ParticipantTaskService {
@@ -41,6 +50,8 @@ export class ParticipantTaskService {
         private participantTaskQuizAnswerRepository: Repository<ParticipantTaskQuizAnswerEntity>,
         @InjectRepository(ParticipantTaskPhotoEntity)
         private participantTaskPhotoRepository: Repository<ParticipantTaskPhotoEntity>,
+        @InjectRepository(ParticipantEntity)
+        private participantRepository: Repository<ParticipantEntity>,
         @Inject(forwardRef(() => ActiveSessionGateway))
         private activeSessionGateway: ActiveSessionGateway,
     ) {
@@ -361,21 +372,44 @@ export class ParticipantTaskService {
             participantTask,
             photoUrl,
             uploadDate: new Date(),
-            isApproved: false,
+            isApproved: null,
         });
-        await this.participantTaskPhotoRepository.save(photo);
+        const savedPhoto = await this.participantTaskPhotoRepository.save(photo);
 
         const completedDate = new Date();
         await this.participantTaskRepository.update(
             { participantTaskId: participantTask.participantTaskId },
             {
-                scoreEarned: task.maxScorePointsCount,
+                scoreEarned: 0,
                 completedDate: completedDate,
             }
         );
 
-        participantTask.scoreEarned = task.maxScorePointsCount;
+        participantTask.scoreEarned = 0;
         participantTask.completedDate = completedDate;
+
+        const session = await this.sessionRepository.findOne({
+            where: { questSessionId: sessionId },
+            relations: ['quest', 'quest.organizer'],
+        });
+
+        if (session) {
+            await this.activeSessionGateway.notifyPhotoSubmitted(
+                sessionId,
+                session.quest.organizer.userId,
+                {
+                    participantTaskPhotoId: savedPhoto.participantTaskPhotoId,
+                    participantTaskId: participantTask.participantTaskId,
+                    userId,
+                    userName,
+                    questTaskId: task.questTaskId,
+                    taskDescription: task.description,
+                    pointName: point.name,
+                    photoUrl: savedPhoto.photoUrl,
+                    uploadDate: savedPhoto.uploadDate,
+                }
+            );
+        }
 
         await this.sendTaskCompletionNotifications(
             sessionId,
@@ -383,15 +417,15 @@ export class ParticipantTaskService {
             userName,
             task.questTaskId,
             point.name,
-            task.maxScorePointsCount,
+            0,
             completedDate
         );
 
         return {
             success: true,
-            scoreEarned: task.maxScorePointsCount,
+            scoreEarned: 0,
             maxScore: task.maxScorePointsCount,
-            passed: true,
+            passed: false,
             completedAt: participantTask.completedDate,
         };
     }
@@ -569,5 +603,176 @@ export class ParticipantTaskService {
         } catch (error) {
             console.error('[ParticipantTaskService] Error sending task completion notifications:', error.message);
         }
+    }
+
+    async getPendingPhotos(sessionId: number, organizerUserId: number): Promise<PendingPhotoDto[]> {
+        const session = await this.sessionRepository.findOne({
+            where: { questSessionId: sessionId },
+            relations: ['quest', 'quest.organizer'],
+        });
+
+        if (!session) {
+            throw new NotFoundException(`Session with ID ${sessionId} not found`);
+        }
+
+        if (session.quest.organizer.userId !== organizerUserId) {
+            throw new ForbiddenException('You are not the organizer of this session');
+        }
+
+        if (!isSessionActive(session)) {
+            throw new BadRequestException('Session is not active');
+        }
+
+        const pendingPhotos = await this.participantTaskPhotoRepository.find({
+            where: {
+                isApproved: IsNull(),
+                participantTask: {
+                    completedDate: Not(IsNull()),
+                    participant: {
+                        session: { questSessionId: sessionId },
+                    },
+                },
+            },
+            relations: [
+                'participantTask',
+                'participantTask.participant',
+                'participantTask.participant.user',
+                'participantTask.task',
+                'participantTask.task.point',
+            ],
+            order: {
+                uploadDate: 'ASC',
+            },
+        });
+
+        return pendingPhotos.map(photo => ({
+            participantTaskPhotoId: photo.participantTaskPhotoId,
+            participantTaskId: photo.participantTask.participantTaskId,
+            userId: photo.participantTask.participant.user.userId,
+            userName: photo.participantTask.participant.user.name,
+            questTaskId: photo.participantTask.task.questTaskId,
+            taskDescription: photo.participantTask.task.description,
+            pointName: photo.participantTask.task.point.name,
+            photoUrl: photo.photoUrl,
+            uploadDate: photo.uploadDate,
+        }));
+    }
+
+    async moderatePhoto(
+        sessionId: number,
+        photoId: number,
+        organizerUserId: number,
+        dto: PhotoModerationActionDto
+    ): Promise<PhotoModerationResponseDto> {
+        const session = await this.sessionRepository.findOne({
+            where: { questSessionId: sessionId },
+            relations: ['quest', 'quest.organizer'],
+        });
+
+        if (!session) {
+            throw new NotFoundException(`Session with ID ${sessionId} not found`);
+        }
+
+        if (session.quest.organizer.userId !== organizerUserId) {
+            throw new ForbiddenException('You are not the organizer of this session');
+        }
+
+        const photo = await this.participantTaskPhotoRepository.findOne({
+            where: { participantTaskPhotoId: photoId },
+            relations: [
+                'participantTask',
+                'participantTask.participant',
+                'participantTask.participant.session',
+                'participantTask.participant.user',
+                'participantTask.task',
+                'participantTask.task.point',
+            ],
+        });
+
+        if (!photo) {
+            throw new NotFoundException(`Photo with ID ${photoId} not found`);
+        }
+
+        if (photo.participantTask.participant.session.questSessionId !== sessionId) {
+            throw new BadRequestException('Photo does not belong to this session');
+        }
+
+        if (photo.isApproved === true) {
+            throw new BadRequestException('Photo has already been moderated and approved');
+        }
+
+        if (!dto.approved && !dto.rejectionReason) {
+            throw new BadRequestException('Rejection reason is required when rejecting a photo');
+        }
+
+        const participantTask = photo.participantTask;
+        const task = participantTask.task;
+        const scoreAdjustment = dto.approved ? task.maxScorePointsCount : 0;
+
+        await this.participantTaskRepository.update(
+            { participantTaskId: participantTask.participantTaskId },
+            { scoreEarned: scoreAdjustment }
+        );
+
+        await this.participantTaskPhotoRepository.update(
+            { participantTaskPhotoId: photoId },
+            { isApproved: dto.approved }
+        );
+
+        const participant = await this.participantRepository.findOne({
+            where: { participantId: participantTask.participant.participantId },
+            relations: ['tasks'],
+        });
+
+        const totalScore = participant.tasks
+            ?.filter(t => t.completedDate !== null)
+            .reduce((sum, t) => sum + (t.scoreEarned || 0), 0) || 0;
+
+        await this.activeSessionGateway.notifyPhotoModerated(
+            sessionId,
+            organizerUserId,
+            participantTask.participant.user.userId,
+            {
+                participantTaskPhotoId: photo.participantTaskPhotoId,
+                participantTaskId: participantTask.participantTaskId,
+                userId: participantTask.participant.user.userId,
+                userName: participantTask.participant.user.name,
+                questTaskId: task.questTaskId,
+                taskDescription: task.description,
+                pointName: task.point.name,
+                photoUrl: photo.photoUrl,
+                approved: dto.approved,
+                rejectionReason: dto.rejectionReason,
+                scoreAdjustment,
+                totalScore,
+            }
+        );
+
+        const allParticipants = await this.participantRepository.find({
+            where: { session: { questSessionId: sessionId } },
+            relations: ['user', 'tasks'],
+        });
+
+        const participantScores = allParticipants
+            .filter(p => p.participationStatus === ParticipantStatus.APPROVED)
+            .map(p => {
+                const completedTasks = p.tasks?.filter(t => t.completedDate !== null) || [];
+                return {
+                    userId: p.user.userId,
+                    userName: p.user.name,
+                    totalScore: completedTasks.reduce((sum, t) => sum + (t.scoreEarned || 0), 0),
+                    completedTasksCount: completedTasks.length,
+                };
+            })
+            .sort((a, b) => b.totalScore - a.totalScore);
+
+        await this.activeSessionGateway.notifyScoresUpdated(sessionId, participantScores);
+
+        return {
+            success: true,
+            message: dto.approved ? 'Photo approved successfully' : 'Photo rejected',
+            scoreAdjustment,
+            totalScore,
+        };
     }
 }

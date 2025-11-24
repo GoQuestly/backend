@@ -2,6 +2,11 @@ import { ApiProperty } from "@nestjs/swagger";
 
 export class SessionPointResponseDto {
     @ApiProperty({
+        example: 1
+    })
+    pointId: number;
+
+    @ApiProperty({
         example: 'Central Park'
     })
     pointName: string;

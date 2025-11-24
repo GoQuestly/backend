@@ -481,6 +481,7 @@ export class QuestSessionService {
             const isUnlocked = isFirstPoint || isPassed || point.orderNum === maxPassedOrderNum + 1;
 
             return {
+                pointId: point.questPointId,
                 pointName: point.name,
                 orderNumber: point.orderNum,
                 isPassed,
