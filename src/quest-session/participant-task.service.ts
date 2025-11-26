@@ -184,6 +184,36 @@ export class ParticipantTaskService {
         };
     }
 
+    async getActiveTask(sessionId: number, userId: number): Promise<StartTaskResponseDto | null> {
+        const {session, participant} = await this.getSessionWithParticipant(sessionId, userId);
+
+        const activeTask = await this.participantTaskRepository.findOne({
+            where: {
+                participant: {participantId: participant.participantId},
+                startDate: Not(IsNull()),
+                completedDate: IsNull(),
+            },
+            relations: ['task'],
+        });
+
+        if (!activeTask) {
+            return null;
+        }
+
+        const now = new Date();
+        const expiresAt = new Date(activeTask.startDate.getTime() + activeTask.task.maxDurationSeconds * 1000);
+
+        if (now > expiresAt) {
+            return null;
+        }
+
+        return {
+            participantTaskId: activeTask.participantTaskId,
+            startDate: activeTask.startDate,
+            expiresAt,
+        };
+    }
+
     async submitQuizAnswer(
         sessionId: number,
         pointId: number,

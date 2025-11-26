@@ -52,6 +52,14 @@ export class ParticipantTaskController {
         return this.participantTaskService.startTask(sessionId, pointId, userId);
     }
 
+    @Get(':sessionId/active-task')
+    async getActiveTask(
+        @Param('sessionId', ParseIntPipe) sessionId: number,
+        @GetUser('userId') userId: number,
+    ): Promise<StartTaskResponseDto | null> {
+        return this.participantTaskService.getActiveTask(sessionId, userId);
+    }
+
     @Post(':sessionId/points/:pointId/task/submit/quiz/answer')
     async submitQuizAnswer(
         @Param('sessionId', ParseIntPipe) sessionId: number,
