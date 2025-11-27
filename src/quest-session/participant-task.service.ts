@@ -34,6 +34,7 @@ import {ActiveSessionGateway} from './active-session.gateway';
 import {ParticipantStatus} from '@/common/enums/participant-status';
 import {PendingPhotoDto, PhotoModerationActionDto, PhotoModerationResponseDto} from './dto/photo-moderation.dto';
 import {ParticipantEntity} from '@/common/entities/participant.entity';
+import {RejectionReason} from '@/common/enums/rejection-reason';
 
 @Injectable()
 export class ParticipantTaskService {
@@ -185,7 +186,7 @@ export class ParticipantTaskService {
     }
 
     async getActiveTask(sessionId: number, userId: number): Promise<StartTaskResponseDto | null> {
-        const {session, participant} = await this.getSessionWithParticipant(sessionId, userId);
+        const {participant} = await this.getSessionWithParticipant(sessionId, userId);
 
         const activeTask = await this.participantTaskRepository.findOne({
             where: {
@@ -328,6 +329,13 @@ export class ParticipantTaskService {
                 completedDate
             );
 
+            await this.checkAndDisqualifyIfRequired(
+                sessionId,
+                participantTask.participant.participantId,
+                task,
+                passed
+            );
+
             return {
                 success: true,
                 scoreEarned,
@@ -379,6 +387,13 @@ export class ParticipantTaskService {
             point.name,
             scoreEarned,
             completedDate
+        );
+
+        await this.checkAndDisqualifyIfRequired(
+            sessionId,
+            participantTask.participant.participantId,
+            task,
+            isCorrect
         );
 
         return {
@@ -635,6 +650,40 @@ export class ParticipantTaskService {
         }
     }
 
+    private async checkAndDisqualifyIfRequired(
+        sessionId: number,
+        participantId: number,
+        task: QuestTaskEntity,
+        passed: boolean
+    ): Promise<void> {
+        try {
+            if (!task.isRequiredForNextPoint) {
+                return;
+            }
+
+            if (!passed) {
+                const participant = await this.participantRepository.findOne({
+                    where: { participantId },
+                    relations: ['user'],
+                });
+
+                if (!participant) {
+                    return;
+                }
+
+                participant.participationStatus = ParticipantStatus.DISQUALIFIED;
+                participant.rejectionReason = RejectionReason.REQUIRED_TASK_NOT_COMPLETED;
+                await this.participantRepository.save(participant);
+
+                await this.activeSessionGateway.notifyParticipantDisqualified(sessionId, participant);
+
+                console.log(`[ParticipantTaskService] Participant ${participantId} disqualified - required task not passed`);
+            }
+        } catch (error) {
+            console.error('[ParticipantTaskService] Error checking disqualification:', error.message);
+        }
+    }
+
     async getPendingPhotos(sessionId: number, organizerUserId: number): Promise<PendingPhotoDto[]> {
         const session = await this.sessionRepository.findOne({
             where: { questSessionId: sessionId },
@@ -797,6 +846,13 @@ export class ParticipantTaskService {
             .sort((a, b) => b.totalScore - a.totalScore);
 
         await this.activeSessionGateway.notifyScoresUpdated(sessionId, participantScores);
+
+        await this.checkAndDisqualifyIfRequired(
+            sessionId,
+            participantTask.participant.participantId,
+            task,
+            dto.approved
+        );
 
         return {
             success: true,
