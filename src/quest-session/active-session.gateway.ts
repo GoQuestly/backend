@@ -13,6 +13,9 @@ import {AuthenticatedSocket, ErrorResponse} from './gateway.types';
 import {forwardRef, Inject} from '@nestjs/common';
 import {QuestPointEntity} from '@/common/entities/quest-point.entity';
 import {ParticipantPointEntity} from '@/common/entities/participant-point.entity';
+import {ParticipantEntity} from '@/common/entities/participant.entity';
+import {ParticipantTaskEntity} from '@/common/entities/participant-task.entity';
+import {RejectionReason} from '@/common/enums/rejection-reason';
 import {calculateDistance, POINT_COMPLETION_RADIUS_METERS} from './participant-task.constants';
 import {isSessionActive} from '@/common/utils/session.util';
 
@@ -40,6 +43,10 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
         private questPointRepository: Repository<QuestPointEntity>,
         @InjectRepository(ParticipantPointEntity)
         private participantPointRepository: Repository<ParticipantPointEntity>,
+        @InjectRepository(ParticipantEntity)
+        private participantRepository: Repository<ParticipantEntity>,
+        @InjectRepository(ParticipantTaskEntity)
+        private participantTaskRepository: Repository<ParticipantTaskEntity>,
     ) {
         super();
     }
@@ -98,6 +105,11 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
             if (!isOrganizer && participant && participant.participationStatus === ParticipantStatus.REJECTED) {
                 return this.emitError(client, 'join-session-error', 'You have been rejected from this session',
                     `[join-session] User ${client.userId} has been rejected from session ${sessionId}`);
+            }
+
+            if (!isOrganizer && participant && participant.participationStatus === ParticipantStatus.DISQUALIFIED) {
+                return this.emitError(client, 'join-session-error', 'You have been disqualified from this session',
+                    `[join-session] User ${client.userId} has been disqualified from session ${sessionId}`);
             }
 
             if (!isSessionActive(session)) {
@@ -170,6 +182,11 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
                     `[leave-session] User ${client.userId} has been rejected from session ${sessionId}`);
             }
 
+            if (!isOrganizer && participant && participant.participationStatus === ParticipantStatus.DISQUALIFIED) {
+                return this.emitError(client, 'leave-session-error', 'You have been disqualified from this session',
+                    `[leave-session] User ${client.userId} has been disqualified from session ${sessionId}`);
+            }
+
             const currentUser = this.getCurrentUser(session, client.userId, isOrganizer);
 
             client.leave(`session-${sessionId}`);
@@ -222,6 +239,11 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
             if (!isOrganizer && participant && participant.participationStatus === ParticipantStatus.REJECTED) {
                 return this.emitError(client, 'update-location-error', 'You have been rejected from this session',
                     `[update-location] User ${client.userId} has been rejected from session ${sessionId}`);
+            }
+
+            if (!isOrganizer && participant && participant.participationStatus === ParticipantStatus.DISQUALIFIED) {
+                return this.emitError(client, 'update-location-error', 'You have been disqualified from this session',
+                    `[update-location] User ${client.userId} has been disqualified from session ${sessionId}`);
             }
 
             const coordinatesError = this.validateCoordinates(latitude, longitude);
@@ -365,6 +387,50 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
         }
     }
 
+    async notifyParticipantDisqualified(sessionId: number, participant: any): Promise<void> {
+        try {
+            if (!sessionId || sessionId <= 0) {
+                return;
+            }
+
+            if (!participant) {
+                return;
+            }
+
+            if (!participant.user) {
+                return;
+            }
+
+            const disqualificationEvent = {
+                participantId: participant.participantId,
+                userId: participant.user.userId,
+                userName: participant.user.name,
+                sessionId,
+                rejectionReason: participant.rejectionReason || 'Unknown',
+                disqualifiedAt: new Date(),
+            };
+
+            this.server.to(`session-${sessionId}`).emit('participant-disqualified', disqualificationEvent);
+
+            const allSockets = await this.server.fetchSockets();
+
+            const participantSockets = allSockets.filter(
+                socket => (socket as unknown as AuthenticatedSocket).userId === participant.user.userId
+            );
+
+            for (const socket of participantSockets) {
+                socket.emit('participant-disqualified', disqualificationEvent);
+
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                socket.disconnect(true);
+            }
+
+        } catch (error) {
+            console.error('[active-session:notify] Error handling participant disqualification:', error.message);
+        }
+    }
+
     async notifySessionCancelled(sessionId: number, organizerName: string): Promise<void> {
         try {
             if (!sessionId || sessionId <= 0) {
@@ -443,6 +509,52 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
 
             if (!nextPoint) {
                 return null;
+            }
+
+            if (maxPassedOrderNum >= 0) {
+                const previousPoint = questPoints.find(p => p.orderNum === maxPassedOrderNum);
+
+                if (previousPoint) {
+                    const previousPointWithTask = await this.questPointRepository.findOne({
+                        where: { questPointId: previousPoint.questPointId },
+                        relations: ['task'],
+                    });
+
+                    if (previousPointWithTask?.task?.isRequiredForNextPoint) {
+                        const participantTask = await this.participantTaskRepository.findOne({
+                            where: {
+                                participant: { participantId: participant.participantId },
+                                task: { questTaskId: previousPointWithTask.task.questTaskId },
+                            },
+                            relations: ['task'],
+                        });
+
+                        if (!participantTask || !participantTask.completedDate) {
+                            participant.participationStatus = ParticipantStatus.DISQUALIFIED;
+                            participant.rejectionReason = RejectionReason.REQUIRED_TASK_NOT_COMPLETED;
+                            await this.participantRepository.save(participant);
+
+                            await this.notifyParticipantDisqualified(sessionId, participant);
+
+                            console.log(`[checkAndPassPoint] User ${userId} disqualified - required task not completed at point ${previousPoint.questPointId}`);
+                            return null;
+                        }
+
+                        const task = previousPointWithTask.task;
+                        const scorePercentage = (participantTask.scoreEarned / task.maxScorePointsCount) * 100;
+
+                        if (scorePercentage < task.successScorePointsPercent) {
+                            participant.participationStatus = ParticipantStatus.DISQUALIFIED;
+                            participant.rejectionReason = RejectionReason.REQUIRED_TASK_NOT_COMPLETED;
+                            await this.participantRepository.save(participant);
+
+                            await this.notifyParticipantDisqualified(sessionId, participant);
+
+                            console.log(`[checkAndPassPoint] User ${userId} disqualified - required task score ${scorePercentage.toFixed(1)}% < ${task.successScorePointsPercent}% at point ${previousPoint.questPointId}`);
+                            return null;
+                        }
+                    }
+                }
             }
 
             const distance = calculateDistance(latitude, longitude, nextPoint.latitude, nextPoint.longitude);
