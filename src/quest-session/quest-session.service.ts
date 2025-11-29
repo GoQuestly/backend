@@ -441,7 +441,7 @@ export class QuestSessionService {
     async getSessionPoints(sessionId: number, userId: number): Promise<SessionPointResponseDto[]> {
         const session = await this.sessionRepository.findOne({
             where: { questSessionId: sessionId },
-            relations: ['quest', 'quest.organizer', 'quest.points', 'participants', 'participants.user', 'participants.points', 'participants.points.point'],
+            relations: ['quest', 'quest.organizer', 'quest.points', 'quest.points.task', 'participants', 'participants.user', 'participants.points', 'participants.points.point'],
         });
 
         if (!session) {
@@ -487,6 +487,8 @@ export class QuestSessionService {
                 isPassed,
                 pointLatitude: isUnlocked ? point.latitude : null,
                 pointLongitude: isUnlocked ? point.longitude : null,
+                hasTask: point.task !== null,
+                isTaskSuccessCompletionRequiredForNextPoint: point.task?.isRequiredForNextPoint ?? false,
             };
         });
     }

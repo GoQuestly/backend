@@ -4,6 +4,9 @@ export class StartTaskResponseDto {
     @ApiProperty({ example: 1 })
     participantTaskId: number;
 
+    @ApiProperty({ example: 1 })
+    questPointId: number;
+
     @ApiProperty({ example: '2024-01-15T10:30:00Z' })
     startDate: Date;
 

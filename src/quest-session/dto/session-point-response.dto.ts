@@ -32,4 +32,14 @@ export class SessionPointResponseDto {
         nullable: true
     })
     pointLongitude: number | null;
+
+    @ApiProperty({
+        example: true
+    })
+    hasTask: boolean;
+
+    @ApiProperty({
+        example: false
+    })
+    isTaskSuccessCompletionRequiredForNextPoint: boolean;
 }
