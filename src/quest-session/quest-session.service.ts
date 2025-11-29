@@ -16,6 +16,7 @@ import {QuestEntity} from '@/common/entities/quest.entity';
 import {UserEntity} from '@/common/entities/user.entity';
 import {QuestSessionEndReason} from '@/common/enums/quest-session-end-reason';
 import {ParticipantStatus} from '@/common/enums/participant-status';
+import {TaskStatus} from '@/common/enums/task-status';
 import {QuestSessionDto} from './dto/quest-session.dto';
 import {randomBytes} from 'crypto';
 import {JoinSessionDto} from "@/quest-session/dto/join-session.dto";
@@ -441,7 +442,7 @@ export class QuestSessionService {
     async getSessionPoints(sessionId: number, userId: number): Promise<SessionPointResponseDto[]> {
         const session = await this.sessionRepository.findOne({
             where: { questSessionId: sessionId },
-            relations: ['quest', 'quest.organizer', 'quest.points', 'quest.points.task', 'participants', 'participants.user', 'participants.points', 'participants.points.point'],
+            relations: ['quest', 'quest.organizer', 'quest.points', 'quest.points.task', 'participants', 'participants.user', 'participants.points', 'participants.points.point', 'participants.tasks', 'participants.tasks.task', 'participants.tasks.task.point'],
         });
 
         if (!session) {
@@ -480,6 +481,30 @@ export class QuestSessionService {
             const isFirstPoint = point.orderNum === firstPointOrderNum;
             const isUnlocked = isFirstPoint || isPassed || point.orderNum === maxPassedOrderNum + 1;
 
+            let taskStatus: TaskStatus | null = null;
+
+            if (point.task && isUnlocked) {
+                const participantTask = participant?.tasks?.find(
+                    pt => pt.task?.point?.questPointId === point.questPointId
+                );
+
+                if (!participantTask || !participantTask.startDate) {
+                    taskStatus = TaskStatus.NOT_STARTED;
+                } else if (participantTask.completedDate) {
+                    const successThreshold = (point.task.maxScorePointsCount * point.task.successScorePointsPercent) / 100;
+                    taskStatus = participantTask.scoreEarned >= successThreshold ? TaskStatus.COMPLETED_SUCCESS : TaskStatus.COMPLETED_FAILED;
+                } else {
+                    const now = new Date();
+                    const elapsedSeconds = (now.getTime() - participantTask.startDate.getTime()) / 1000;
+
+                    if (elapsedSeconds > point.task.maxDurationSeconds) {
+                        taskStatus = TaskStatus.EXPIRED;
+                    } else {
+                        taskStatus = TaskStatus.IN_PROGRESS;
+                    }
+                }
+            }
+
             return {
                 pointId: point.questPointId,
                 pointName: point.name,
@@ -489,6 +514,7 @@ export class QuestSessionService {
                 pointLongitude: isUnlocked ? point.longitude : null,
                 hasTask: point.task !== null,
                 isTaskSuccessCompletionRequiredForNextPoint: point.task?.isRequiredForNextPoint ?? false,
+                taskStatus,
             };
         });
     }
