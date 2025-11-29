@@ -161,6 +161,7 @@ export class ParticipantTaskService {
             const expiresAt = new Date(existingTask.startDate.getTime() + point.task.maxDurationSeconds * 1000);
             return {
                 participantTaskId: existingTask.participantTaskId,
+                questPointId: point.questPointId,
                 startDate: existingTask.startDate,
                 expiresAt,
             };
@@ -180,6 +181,7 @@ export class ParticipantTaskService {
 
         return {
             participantTaskId: savedTask.participantTaskId,
+            questPointId: point.questPointId,
             startDate: savedTask.startDate,
             expiresAt,
         };
@@ -194,7 +196,7 @@ export class ParticipantTaskService {
                 startDate: Not(IsNull()),
                 completedDate: IsNull(),
             },
-            relations: ['task'],
+            relations: ['task', 'task.point'],
         });
 
         if (!activeTask) {
@@ -210,6 +212,7 @@ export class ParticipantTaskService {
 
         return {
             participantTaskId: activeTask.participantTaskId,
+            questPointId: activeTask.task.point.questPointId,
             startDate: activeTask.startDate,
             expiresAt,
         };
