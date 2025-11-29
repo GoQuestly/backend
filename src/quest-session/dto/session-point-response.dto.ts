@@ -1,4 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
+import { TaskStatus } from "@/common/enums/task-status";
 
 export class SessionPointResponseDto {
     @ApiProperty({
@@ -42,4 +43,12 @@ export class SessionPointResponseDto {
         example: false
     })
     isTaskSuccessCompletionRequiredForNextPoint: boolean;
+
+    @ApiProperty({
+        example: TaskStatus.NOT_STARTED,
+        nullable: true,
+        description: 'Task status: null (no task or locked)',
+        enum: TaskStatus
+    })
+    taskStatus: TaskStatus | null;
 }
