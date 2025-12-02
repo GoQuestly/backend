@@ -16,15 +16,15 @@ import {ParticipantTaskService} from './participant-task.service';
 import {ParticipantTaskResponseDto} from './dto/participant-task-response.dto';
 import {StartTaskResponseDto} from './dto/start-task.dto';
 import {
-    QuizAnswerResponseDto,
-    SubmitCodeWordTaskDto,
-    SubmitQuizAnswerDto,
-    TaskCompletionResponseDto
+    SubmitQuizAnswerDto
 } from './dto/submit-task.dto';
 import {FileUpload} from '@/common/decorators/file-upload.decorator';
 import {TASK_PHOTO_UPLOAD_CONFIG} from '@/common/constants/file-upload.constants';
 // @ts-ignore
 import type {File} from 'multer';
+import {TaskCompletionResponseDto} from "@/quest-session/dto/task-completion-response.dto";
+import {SubmitCodeWordTaskDto} from "@/quest-session/dto/submit-code-word-task.dto";
+import {QuizAnswerResponseDto} from "@/quest-session/dto/quiz-answer-response.dto";
 
 @ApiTags('Participant - Tasks')
 @ApiBearerAuth()

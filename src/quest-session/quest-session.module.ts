@@ -11,6 +11,7 @@ import {ParticipantTaskService} from './participant-task.service';
 import {ActiveSessionGateway} from './active-session.gateway';
 import {SessionEventsGateway} from './session-events.gateway';
 import {SessionEndValidatorService} from './session-end-validator.service';
+import {TaskExpiryValidatorService} from './task-expiry-validator.service';
 import {QuestSessionEntity} from '@/common/entities/quest-session.entity';
 import {ParticipantEntity} from '@/common/entities/participant.entity';
 import {ParticipantLocationEntity} from '@/common/entities/participant-location.entity';
@@ -61,6 +62,7 @@ import {EmailModule} from '@/email/email.module';
         ActiveSessionGateway,
         SessionEventsGateway,
         SessionEndValidatorService,
+        TaskExpiryValidatorService,
     ],
     exports: [QuestSessionService, LocationService],
 })

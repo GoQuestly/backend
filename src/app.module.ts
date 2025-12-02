@@ -23,6 +23,7 @@ import { QuestModule } from './quest/quest.module';
 import { QuestPointModule } from "@/quest-point/quest-point.module";
 import { QuestTaskModule } from "@/quest-task/quest-task.module";
 import { QuestSessionModule } from "@/quest-session/quest-session.module";
+import { ServerTimeController } from "@/common/server-time.controller";
 
 @Module({
     imports: [
@@ -55,6 +56,7 @@ import { QuestSessionModule } from "@/quest-session/quest-session.module";
         QuestTaskModule,
         QuestSessionModule,
     ],
+    controllers: [ServerTimeController],
 })
 
 export class AppModule {}

@@ -52,7 +52,7 @@ export class OrganizerSessionController {
         @Param('id', ParseIntPipe) id: number,
         @GetUser('userId') userId: number,
     ): Promise<QuestSessionResponseDto> {
-        return this.sessionService.findById(id, userId);
+        return this.sessionService.findById(id, userId, true);
     }
 
     @Put('sessions/:id')
@@ -77,7 +77,7 @@ export class OrganizerSessionController {
         @Param('id', ParseIntPipe) id: number,
         @GetUser('userId') userId: number,
     ): Promise<ParticipantScoresResponseDto> {
-        return this.sessionService.getParticipantScores(id, userId);
+        return this.sessionService.getParticipantScores(id, userId, true, false);
     }
 
     @Get('sessions/:id/locations/latest')
