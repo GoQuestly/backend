@@ -72,7 +72,7 @@ export class ParticipantSessionController {
         @Param('id', ParseIntPipe) id: number,
         @GetUser('userId') userId: number,
     ): Promise<ParticipantScoresResponseDto> {
-        return this.sessionService.getParticipantScores(id, userId);
+        return this.sessionService.getParticipantScores(id, userId, false, true);
     }
 
     @Delete(':id/leave')

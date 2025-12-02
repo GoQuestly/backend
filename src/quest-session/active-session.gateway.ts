@@ -102,14 +102,12 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
                     `[join-session] User ${client.userId} has no access to session ${sessionId}`);
             }
 
-            if (!isOrganizer && participant && participant.participationStatus === ParticipantStatus.REJECTED) {
-                return this.emitError(client, 'join-session-error', 'You have been rejected from this session',
-                    `[join-session] User ${client.userId} has been rejected from session ${sessionId}`);
-            }
-
-            if (!isOrganizer && participant && participant.participationStatus === ParticipantStatus.DISQUALIFIED) {
-                return this.emitError(client, 'join-session-error', 'You have been disqualified from this session',
-                    `[join-session] User ${client.userId} has been disqualified from session ${sessionId}`);
+            if (!isOrganizer && participant && (participant.participationStatus === ParticipantStatus.REJECTED || participant.participationStatus === ParticipantStatus.DISQUALIFIED)) {
+                const message = participant.participationStatus === ParticipantStatus.REJECTED
+                    ? 'You have been rejected from this session'
+                    : 'You have been disqualified from this session';
+                return this.emitError(client, 'join-session-error', message,
+                    `[join-session] User ${client.userId} status: ${participant.participationStatus} in session ${sessionId}`);
             }
 
             if (!isSessionActive(session)) {
@@ -177,14 +175,12 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
                     `[leave-session] User ${client.userId} has no access to session ${sessionId}`);
             }
 
-            if (!isOrganizer && participant && participant.participationStatus === ParticipantStatus.REJECTED) {
-                return this.emitError(client, 'leave-session-error', 'You have been rejected from this session',
-                    `[leave-session] User ${client.userId} has been rejected from session ${sessionId}`);
-            }
-
-            if (!isOrganizer && participant && participant.participationStatus === ParticipantStatus.DISQUALIFIED) {
-                return this.emitError(client, 'leave-session-error', 'You have been disqualified from this session',
-                    `[leave-session] User ${client.userId} has been disqualified from session ${sessionId}`);
+            if (!isOrganizer && participant && (participant.participationStatus === ParticipantStatus.REJECTED || participant.participationStatus === ParticipantStatus.DISQUALIFIED)) {
+                const message = participant.participationStatus === ParticipantStatus.REJECTED
+                    ? 'You have been rejected from this session'
+                    : 'You have been disqualified from this session';
+                return this.emitError(client, 'leave-session-error', message,
+                    `[leave-session] User ${client.userId} status: ${participant.participationStatus} in session ${sessionId}`);
             }
 
             const currentUser = this.getCurrentUser(session, client.userId, isOrganizer);
@@ -236,14 +232,12 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
                     `[update-location] User ${client.userId} has no access to session ${sessionId}`);
             }
 
-            if (!isOrganizer && participant && participant.participationStatus === ParticipantStatus.REJECTED) {
-                return this.emitError(client, 'update-location-error', 'You have been rejected from this session',
-                    `[update-location] User ${client.userId} has been rejected from session ${sessionId}`);
-            }
-
-            if (!isOrganizer && participant && participant.participationStatus === ParticipantStatus.DISQUALIFIED) {
-                return this.emitError(client, 'update-location-error', 'You have been disqualified from this session',
-                    `[update-location] User ${client.userId} has been disqualified from session ${sessionId}`);
+            if (!isOrganizer && participant && (participant.participationStatus === ParticipantStatus.REJECTED || participant.participationStatus === ParticipantStatus.DISQUALIFIED)) {
+                const message = participant.participationStatus === ParticipantStatus.REJECTED
+                    ? 'You have been rejected from this session'
+                    : 'You have been disqualified from this session';
+                return this.emitError(client, 'update-location-error', message,
+                    `[update-location] User ${client.userId} status: ${participant.participationStatus} in session ${sessionId}`);
             }
 
             const coordinatesError = this.validateCoordinates(latitude, longitude);
@@ -520,7 +514,7 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
                         relations: ['task'],
                     });
 
-                    if (previousPointWithTask?.task?.isRequiredForNextPoint) {
+                    if (previousPointWithTask?.task) {
                         const participantTask = await this.participantTaskRepository.findOne({
                             where: {
                                 participant: { participantId: participant.participantId },
@@ -530,28 +524,24 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
                         });
 
                         if (!participantTask || !participantTask.completedDate) {
-                            participant.participationStatus = ParticipantStatus.DISQUALIFIED;
-                            participant.rejectionReason = RejectionReason.REQUIRED_TASK_NOT_COMPLETED;
-                            await this.participantRepository.save(participant);
-
-                            await this.notifyParticipantDisqualified(sessionId, participant);
-
-                            console.log(`[checkAndPassPoint] User ${userId} disqualified - required task not completed at point ${previousPoint.questPointId}`);
+                            console.log(`[checkAndPassPoint] User ${userId} cannot proceed - task not completed at point ${previousPoint.questPointId}`);
                             return null;
                         }
 
-                        const task = previousPointWithTask.task;
-                        const scorePercentage = (participantTask.scoreEarned / task.maxScorePointsCount) * 100;
+                        if (previousPointWithTask.task.isRequiredForNextPoint) {
+                            const task = previousPointWithTask.task;
+                            const scorePercentage = (participantTask.scoreEarned / task.maxScorePointsCount) * 100;
 
-                        if (scorePercentage < task.successScorePointsPercent) {
-                            participant.participationStatus = ParticipantStatus.DISQUALIFIED;
-                            participant.rejectionReason = RejectionReason.REQUIRED_TASK_NOT_COMPLETED;
-                            await this.participantRepository.save(participant);
+                            if (scorePercentage < task.successScorePointsPercent) {
+                                participant.participationStatus = ParticipantStatus.DISQUALIFIED;
+                                participant.rejectionReason = RejectionReason.REQUIRED_TASK_NOT_COMPLETED;
+                                await this.participantRepository.save(participant);
 
-                            await this.notifyParticipantDisqualified(sessionId, participant);
+                                await this.notifyParticipantDisqualified(sessionId, participant);
 
-                            console.log(`[checkAndPassPoint] User ${userId} disqualified - required task score ${scorePercentage.toFixed(1)}% < ${task.successScorePointsPercent}% at point ${previousPoint.questPointId}`);
-                            return null;
+                                console.log(`[checkAndPassPoint] User ${userId} disqualified - required task score ${scorePercentage.toFixed(1)}% < ${task.successScorePointsPercent}% at point ${previousPoint.questPointId}`);
+                                return null;
+                            }
                         }
                     }
                 }

@@ -184,6 +184,13 @@ export class LocationService {
             throw new ForbiddenException('Only the session organizer can access latest locations');
         }
 
+        const now = new Date();
+        const isActive = !session.endReason && session.startDate <= now && (!session.endDate || session.endDate > now);
+
+        if (!isActive) {
+            throw new BadRequestException('Session is not active');
+        }
+
         const latestLocations: ParticipantLocationDto[] = [];
 
         for (const participant of session.participants) {

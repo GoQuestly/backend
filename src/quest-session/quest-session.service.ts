@@ -17,6 +17,7 @@ import {UserEntity} from '@/common/entities/user.entity';
 import {QuestSessionEndReason} from '@/common/enums/quest-session-end-reason';
 import {ParticipantStatus} from '@/common/enums/participant-status';
 import {TaskStatus} from '@/common/enums/task-status';
+import {QuestTaskType} from '@/common/enums/quest-task-type';
 import {QuestSessionDto} from './dto/quest-session.dto';
 import {randomBytes} from 'crypto';
 import {JoinSessionDto} from "@/quest-session/dto/join-session.dto";
@@ -121,7 +122,7 @@ export class QuestSessionService {
         return this.findById(session.questSessionId);
     }
 
-    async findById(id: number, userId?: number): Promise<QuestSessionResponseDto> {
+    async findById(id: number, userId?: number, requireOrganizer: boolean = false): Promise<QuestSessionResponseDto> {
         const session = await this.sessionRepository.findOne({
             where: { questSessionId: id },
             relations: ['quest', 'quest.organizer', 'quest.points', 'participants', 'participants.user', 'participants.points'],
@@ -137,8 +138,14 @@ export class QuestSessionService {
             const isOrganizer = session.quest.organizer.userId === userId;
             currentParticipant = session.participants.find(p => p.user.userId === userId);
 
-            if (!isOrganizer && !currentParticipant) {
-                throw new ForbiddenException('You do not have access to this session');
+            if (requireOrganizer) {
+                if (!isOrganizer) {
+                    throw new ForbiddenException('Only the quest organizer can access this session');
+                }
+            } else {
+                if (!isOrganizer && !currentParticipant) {
+                    throw new ForbiddenException('You do not have access to this session');
+                }
             }
         }
 
@@ -168,7 +175,7 @@ export class QuestSessionService {
             .leftJoinAndSelect('session.quest', 'quest')
             .leftJoinAndSelect('session.participants', 'participants')
             .where('quest.questId = :questId', { questId })
-            .orderBy('session.startDate', 'ASC')
+            .orderBy('session.startDate', 'DESC')
             .skip((pageNumber - 1) * pageSize)
             .take(pageSize);
 
@@ -196,7 +203,7 @@ export class QuestSessionService {
             .leftJoinAndSelect('session.participants', 'participants')
             .leftJoinAndSelect('participant.points', 'participantPoints')
             .where('participant.user.userId = :userId', { userId })
-            .orderBy('session.startDate', 'ASC')
+            .orderBy('session.startDate', 'DESC')
             .skip(offset)
             .take(limit);
 
@@ -442,7 +449,7 @@ export class QuestSessionService {
     async getSessionPoints(sessionId: number, userId: number): Promise<SessionPointResponseDto[]> {
         const session = await this.sessionRepository.findOne({
             where: { questSessionId: sessionId },
-            relations: ['quest', 'quest.organizer', 'quest.points', 'quest.points.task', 'participants', 'participants.user', 'participants.points', 'participants.points.point', 'participants.tasks', 'participants.tasks.task', 'participants.tasks.task.point'],
+            relations: ['quest', 'quest.organizer', 'quest.points', 'quest.points.task', 'participants', 'participants.user', 'participants.points', 'participants.points.point', 'participants.tasks', 'participants.tasks.task', 'participants.tasks.task.point', 'participants.tasks.photo'],
         });
 
         if (!session) {
@@ -459,6 +466,13 @@ export class QuestSessionService {
 
         if (!participant) {
             throw new ForbiddenException('You do not have access to this session');
+        }
+
+        if (participant.participationStatus === ParticipantStatus.DISQUALIFIED || participant.participationStatus === ParticipantStatus.REJECTED) {
+            const message = participant.participationStatus === ParticipantStatus.REJECTED
+                ? 'You have been rejected from this session'
+                : 'You have been disqualified from this session';
+            throw new ForbiddenException(message);
         }
 
         const questPoints = [...(session.quest.points || [])].sort((a, b) => a.orderNum - b.orderNum);
@@ -491,8 +505,18 @@ export class QuestSessionService {
                 if (!participantTask || !participantTask.startDate) {
                     taskStatus = TaskStatus.NOT_STARTED;
                 } else if (participantTask.completedDate) {
-                    const successThreshold = (point.task.maxScorePointsCount * point.task.successScorePointsPercent) / 100;
-                    taskStatus = participantTask.scoreEarned >= successThreshold ? TaskStatus.COMPLETED_SUCCESS : TaskStatus.COMPLETED_FAILED;
+                    if (point.task.taskType === QuestTaskType.PHOTO) {
+                        const photo = participantTask.photo;
+                        if (photo && photo.isApproved === null) {
+                            taskStatus = TaskStatus.IN_REVIEW;
+                        } else {
+                            const successThreshold = (point.task.maxScorePointsCount * point.task.successScorePointsPercent) / 100;
+                            taskStatus = participantTask.scoreEarned >= successThreshold ? TaskStatus.COMPLETED_SUCCESS : TaskStatus.COMPLETED_FAILED;
+                        }
+                    } else {
+                        const successThreshold = (point.task.maxScorePointsCount * point.task.successScorePointsPercent) / 100;
+                        taskStatus = participantTask.scoreEarned >= successThreshold ? TaskStatus.COMPLETED_SUCCESS : TaskStatus.COMPLETED_FAILED;
+                    }
                 } else {
                     const now = new Date();
                     const elapsedSeconds = (now.getTime() - participantTask.startDate.getTime()) / 1000;
@@ -519,7 +543,7 @@ export class QuestSessionService {
         });
     }
 
-    async getParticipantScores(sessionId: number, userId: number) {
+    async getParticipantScores(sessionId: number, userId: number, requireOrganizer: boolean = false, requireParticipant: boolean = false) {
         const session = await this.sessionRepository.findOne({
             where: {questSessionId: sessionId},
             relations: [
@@ -538,10 +562,30 @@ export class QuestSessionService {
         }
 
         const isOrganizer = session.quest.organizer.userId === userId;
-        const isParticipant = session.participants.some(p => p.user.userId === userId);
+        const participant = session.participants.find(p => p.user.userId === userId);
+        const isParticipant = !!participant;
 
-        if (!isOrganizer && !isParticipant) {
-            throw new ForbiddenException('You do not have access to this session');
+        if (requireOrganizer) {
+            if (!isOrganizer) {
+                throw new ForbiddenException('Only the quest organizer can access this endpoint');
+            }
+        } else if (requireParticipant) {
+            if (isOrganizer) {
+                throw new ForbiddenException('Only quest participants can access this endpoint');
+            }
+            if (!isParticipant) {
+                throw new ForbiddenException('You do not have access to this session');
+            }
+            if (participant.participationStatus === ParticipantStatus.DISQUALIFIED || participant.participationStatus === ParticipantStatus.REJECTED) {
+                const message = participant.participationStatus === ParticipantStatus.REJECTED
+                    ? 'You have been rejected from this session'
+                    : 'You have been disqualified from this session';
+                throw new ForbiddenException(message);
+            }
+        } else {
+            if (!isOrganizer && !isParticipant) {
+                throw new ForbiddenException('You do not have access to this session');
+            }
         }
 
         const totalTasksInQuest = session.quest.points.filter(p => p.task !== null).length;

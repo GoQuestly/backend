@@ -24,10 +24,7 @@ import {
 } from './dto/participant-task-response.dto';
 import {StartTaskResponseDto} from './dto/start-task.dto';
 import {
-    QuizAnswerResponseDto,
-    SubmitCodeWordTaskDto,
-    SubmitQuizAnswerDto,
-    TaskCompletionResponseDto
+    SubmitQuizAnswerDto
 } from './dto/submit-task.dto';
 import {isSessionActive} from '@/common/utils/session.util';
 import {ActiveSessionGateway} from './active-session.gateway';
@@ -35,6 +32,9 @@ import {ParticipantStatus} from '@/common/enums/participant-status';
 import {PendingPhotoDto, PhotoModerationActionDto, PhotoModerationResponseDto} from './dto/photo-moderation.dto';
 import {ParticipantEntity} from '@/common/entities/participant.entity';
 import {RejectionReason} from '@/common/enums/rejection-reason';
+import {TaskCompletionResponseDto} from "@/quest-session/dto/task-completion-response.dto";
+import {SubmitCodeWordTaskDto} from "@/quest-session/dto/submit-code-word-task.dto";
+import {QuizAnswerResponseDto} from "@/quest-session/dto/quiz-answer-response.dto";
 
 @Injectable()
 export class ParticipantTaskService {
@@ -158,13 +158,9 @@ export class ParticipantTaskService {
                 throw new BadRequestException('Task has already been completed');
             }
 
-            const expiresAt = new Date(existingTask.startDate.getTime() + point.task.maxDurationSeconds * 1000);
-            return {
-                participantTaskId: existingTask.participantTaskId,
-                questPointId: point.questPointId,
-                startDate: existingTask.startDate,
-                expiresAt,
-            };
+            if (existingTask.startDate) {
+                throw new BadRequestException('Task has already been started');
+            }
         }
 
         const participantTask = this.participantTaskRepository.create({
@@ -545,6 +541,13 @@ export class ParticipantTaskService {
 
         if (!participant) {
             throw new ForbiddenException('You are not a participant in this session');
+        }
+
+        if (participant.participationStatus === ParticipantStatus.DISQUALIFIED || participant.participationStatus === ParticipantStatus.REJECTED) {
+            const message = participant.participationStatus === ParticipantStatus.REJECTED
+                ? 'You have been rejected from this session'
+                : 'You have been disqualified from this session';
+            throw new ForbiddenException(message);
         }
 
         return {session, participant};
