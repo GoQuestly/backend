@@ -771,4 +771,23 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
             console.error('[active-session:notify] Error notifying about photo moderation:', error.message);
         }
     }
+
+    async getActiveParticipantIds(sessionId: number): Promise<Set<number>> {
+        try {
+            const sessionSockets = await this.server.in(`session-${sessionId}`).fetchSockets();
+            const activeUserIds = new Set<number>();
+
+            for (const socket of sessionSockets) {
+                const authSocket = socket as unknown as AuthenticatedSocket;
+                if (authSocket.userId) {
+                    activeUserIds.add(authSocket.userId);
+                }
+            }
+
+            return activeUserIds;
+        } catch (error) {
+            console.error(`[getActiveParticipantIds] Error getting active participants:`, error.message);
+            return new Set<number>();
+        }
+    }
 }

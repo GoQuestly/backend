@@ -35,4 +35,10 @@ export class ParticipantLocationDto {
         example: '2025-10-31T12:34:56Z'
     })
     timestamp: Date;
+
+    @ApiProperty({
+        example: true,
+        description: 'Whether the participant is currently active (connected via WebSocket)'
+    })
+    isActive: boolean;
 }
