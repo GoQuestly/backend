@@ -102,7 +102,7 @@ export class LocationService {
             }
         }
 
-        return this.mapToDto(savedLocation, participant);
+        return this.mapToDto(savedLocation, participant, true);
     }
 
     async getSessionLocations(
@@ -191,6 +191,7 @@ export class LocationService {
             throw new BadRequestException('Session is not active');
         }
 
+        const activeParticipantIds = await this.locationGateway.getActiveParticipantIds(sessionId);
         const latestLocations: ParticipantLocationDto[] = [];
 
         for (const participant of session.participants) {
@@ -205,7 +206,8 @@ export class LocationService {
             });
 
             if (location) {
-                latestLocations.push(this.mapToDto(location, location.participant));
+                const isParticipantActive = activeParticipantIds.has(participant.user.userId);
+                latestLocations.push(this.mapToDto(location, location.participant, isParticipantActive));
             }
         }
 
@@ -243,7 +245,7 @@ export class LocationService {
         }
     }
 
-    private mapToDto(location: ParticipantLocationEntity, participant: ParticipantEntity): ParticipantLocationDto {
+    private mapToDto(location: ParticipantLocationEntity, participant: ParticipantEntity, isActive: boolean = false): ParticipantLocationDto {
         return {
             participantLocationId: location.participantLocationId,
             participantId: participant.participantId,
@@ -252,6 +254,7 @@ export class LocationService {
             latitude: location.latitude,
             longitude: location.longitude,
             timestamp: location.timestamp,
+            isActive,
         };
     }
 }
