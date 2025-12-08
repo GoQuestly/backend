@@ -62,11 +62,6 @@ export class QuestSessionResponseDto {
     questPointCount: number;
 
     @ApiProperty({
-        example: 3
-    })
-    passedQuestPointCount: number;
-
-    @ApiProperty({
         example: '/uploads/quests/photo.jpg',
         nullable: true
     })

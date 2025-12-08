@@ -616,7 +616,6 @@ export class QuestSessionService {
     private mapToResponseDto(session: QuestSessionEntity, participant?: ParticipantEntity): QuestSessionResponseDto {
         const questPoints = session.quest.points || [];
         const questPointCount = questPoints.length;
-        const passedQuestPointCount = participant?.points?.length || 0;
 
         const startPoint = questPoints.length > 0
             ? questPoints.reduce((min, point) => point.orderNum < min.orderNum ? point : min, questPoints[0])
@@ -638,11 +637,11 @@ export class QuestSessionService {
                 joinedAt: p.createdAt,
                 participationStatus: p.participationStatus,
                 rejectionReason: p.rejectionReason,
+                passedQuestPointCount: p.points?.length || 0,
             })),
             isActive: isSessionActive(session),
             participantCount: session.participants?.length || 0,
             questPointCount,
-            passedQuestPointCount,
             questPhotoUrl: getAbsoluteUrl(this.request, session.quest.photoUrl),
             questDescription: session.quest.description,
             questMaxDurationMinutes: session.quest.maxDurationMinutes,
