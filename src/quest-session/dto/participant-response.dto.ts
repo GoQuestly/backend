@@ -44,4 +44,10 @@ export class ParticipantResponseDto {
         required: false
     })
     rejectionReason?: RejectionReason;
+
+    @ApiProperty({
+        example: 3,
+        required: false
+    })
+    passedQuestPointCount?: number;
 }
