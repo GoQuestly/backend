@@ -41,7 +41,7 @@ export class LocationService {
     ): Promise<ParticipantLocationDto> {
         const session = await this.sessionRepository.findOne({
             where: { questSessionId: sessionId },
-            relations: ['quest'],
+            relations: ['quest', 'quest.organizer'],
         });
 
         if (!session) {
@@ -94,7 +94,7 @@ export class LocationService {
                 participant.rejectionReason = RejectionReason.TOO_FAR_FROM_START;
                 await this.participantRepository.save(participant);
 
-                await this.locationGateway.notifyParticipantRejected(sessionId, participant);
+                await this.locationGateway.notifyParticipantRejected(sessionId, session.quest.organizer.userId, participant);
             } else {
                 participant.participationStatus = ParticipantStatus.APPROVED;
                 participant.rejectionReason = null;
@@ -240,7 +240,7 @@ export class LocationService {
                 participant.rejectionReason = RejectionReason.NO_LOCATION;
                 await this.participantRepository.save(participant);
 
-                await this.locationGateway.notifyParticipantRejected(sessionId, participant);
+                await this.locationGateway.notifyParticipantRejected(sessionId, session.quest.organizer.userId, participant);
             }
         }
     }

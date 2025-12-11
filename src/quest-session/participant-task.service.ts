@@ -668,6 +668,15 @@ export class ParticipantTaskService {
             }
 
             if (!passed) {
+                const session = await this.sessionRepository.findOne({
+                    where: { questSessionId: sessionId },
+                    relations: ['quest', 'quest.organizer'],
+                });
+
+                if (!session) {
+                    return;
+                }
+
                 const participant = await this.participantRepository.findOne({
                     where: { participantId },
                     relations: ['user'],
@@ -681,7 +690,7 @@ export class ParticipantTaskService {
                 participant.rejectionReason = RejectionReason.REQUIRED_TASK_NOT_COMPLETED;
                 await this.participantRepository.save(participant);
 
-                await this.activeSessionGateway.notifyParticipantDisqualified(sessionId, participant);
+                await this.activeSessionGateway.notifyParticipantDisqualified(sessionId, session.quest.organizer.userId, participant);
 
                 console.log(`[ParticipantTaskService] Participant ${participantId} disqualified - required task not passed`);
             }
