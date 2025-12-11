@@ -24,11 +24,17 @@ import {JoinSessionDto} from "@/quest-session/dto/join-session.dto";
 import {QuestSessionResponseDto} from "@/quest-session/dto/quest-session-response.dto";
 import {QuestSessionListResponseDto} from "@/quest-session/dto/quest-session-list-response.dto";
 import {SessionPointResponseDto} from "@/quest-session/dto/session-point-response.dto";
+import {SessionResultsResponseDto} from './dto/session-results-response.dto';
 import {SessionEventsGateway} from './session-events.gateway';
 import {ActiveSessionGateway} from './active-session.gateway';
+import {LocationService} from './location.service';
 import {REQUEST} from '@nestjs/core';
 import {Request} from 'express';
 import {getAbsoluteUrl} from '@/common/utils/url.util';
+import {ParticipantRankingDto} from "@/quest-session/dto/participant-ranking.dto";
+import {OrganizerSessionResultsResponseDto} from "@/quest-session/dto/organizer-session-results-response.dto";
+import {SessionStatisticsDto} from "@/quest-session/dto/session-statistics.dto";
+import {ParticipantRankingWithRouteDto} from "@/quest-session/dto/participant-ranking-with-route.dto";
 
 @Injectable()
 export class QuestSessionService {
@@ -45,6 +51,8 @@ export class QuestSessionService {
         private participantGateway: SessionEventsGateway,
         @Inject(forwardRef(() => ActiveSessionGateway))
         private activeSessionGateway: ActiveSessionGateway,
+        @Inject(forwardRef(() => LocationService))
+        private locationService: LocationService,
         @Inject(REQUEST) private readonly request: Request,
     ) {}
 
@@ -149,7 +157,7 @@ export class QuestSessionService {
             }
         }
 
-        return this.mapToResponseDto(session, currentParticipant);
+        return this.mapToResponseDto(session);
     }
 
     async findByQuestId(
@@ -613,7 +621,147 @@ export class QuestSessionService {
         };
     }
 
-    private mapToResponseDto(session: QuestSessionEntity, participant?: ParticipantEntity): QuestSessionResponseDto {
+    async getSessionResults(
+        sessionId: number,
+        userId: number,
+        requireOrganizer: boolean = false
+    ): Promise<SessionResultsResponseDto | OrganizerSessionResultsResponseDto> {
+        const session = await this.sessionRepository.findOne({
+            where: { questSessionId: sessionId },
+            relations: [
+                'quest',
+                'quest.organizer',
+                'quest.points',
+                'participants',
+                'participants.user',
+                'participants.points',
+                'participants.tasks',
+            ],
+        });
+
+        if (!session) {
+            throw new NotFoundException(`Session with ID ${sessionId} not found`);
+        }
+
+        if (!session.endReason) {
+            throw new BadRequestException('Session results are only available after the session has ended');
+        }
+
+        const isOrganizer = session.quest.organizer.userId === userId;
+        const participant = session.participants.find(p => p.user.userId === userId);
+        const isParticipant = !!participant;
+
+        if (requireOrganizer && !isOrganizer) {
+            throw new ForbiddenException('Only the quest organizer can access this endpoint');
+        }
+
+        if (!requireOrganizer && !isOrganizer && !isParticipant) {
+            throw new ForbiddenException('You do not have access to this session');
+        }
+
+        const sessionDurationSeconds = session.endDate
+            ? Math.floor((session.endDate.getTime() - session.startDate.getTime()) / 1000)
+            : 0;
+
+        const finishedParticipants = session.participants.filter(
+            p => p.participationStatus === ParticipantStatus.APPROVED && p.finishDate !== null
+        );
+
+        const rejectedParticipants = session.participants.filter(
+            p => p.participationStatus === ParticipantStatus.REJECTED
+        );
+
+        const disqualifiedParticipants = session.participants.filter(
+            p => p.participationStatus === ParticipantStatus.DISQUALIFIED
+        );
+
+        const statistics: SessionStatisticsDto = {
+            sessionDurationSeconds,
+            totalParticipantsCount: session.participants.length,
+            finishedParticipantsCount: finishedParticipants.length,
+            rejectedParticipantsCount: rejectedParticipants.length,
+            disqualifiedParticipantsCount: disqualifiedParticipants.length,
+        };
+
+        const approvedParticipants = session.participants
+            .filter(p => p.participationStatus === ParticipantStatus.APPROVED)
+            .map(p => {
+                const completedTasks = p.tasks?.filter(t => t.completedDate !== null) || [];
+                const totalScore = completedTasks.reduce((sum, task) => sum + (task.scoreEarned || 0), 0);
+                const passedCheckpointsCount = p.points?.length || 0;
+
+                let completionTimeSeconds: number | null = null;
+                if (p.finishDate) {
+                    completionTimeSeconds = Math.floor((p.finishDate.getTime() - session.startDate.getTime()) / 1000);
+                }
+
+                return {
+                    participantId: p.participantId,
+                    userId: p.user.userId,
+                    userName: p.user.name,
+                    photoUrl: getAbsoluteUrl(this.request, p.user.photoUrl),
+                    totalScore,
+                    passedCheckpointsCount,
+                    finishDate: p.finishDate,
+                    completionTimeSeconds,
+                };
+            });
+
+        approvedParticipants.sort((a, b) => {
+            if (a.finishDate && !b.finishDate) return -1;
+            if (!a.finishDate && b.finishDate) return 1;
+
+            if (a.passedCheckpointsCount !== b.passedCheckpointsCount) {
+                return b.passedCheckpointsCount - a.passedCheckpointsCount;
+            }
+
+            if (a.totalScore !== b.totalScore) {
+                return b.totalScore - a.totalScore;
+            }
+
+            if (a.finishDate && b.finishDate && a.completionTimeSeconds && b.completionTimeSeconds) {
+                return a.completionTimeSeconds - b.completionTimeSeconds;
+            }
+
+            return 0;
+        });
+
+        const rankings: ParticipantRankingDto[] = approvedParticipants.map((p, index) => ({
+            rank: index + 1,
+            ...p,
+        }));
+
+        if (isOrganizer) {
+            const rankingsWithRoutes: ParticipantRankingWithRouteDto[] = [];
+
+            for (const ranking of rankings) {
+                const locationHistory = await this.locationService.getSessionLocations(
+                    sessionId,
+                    userId,
+                    ranking.participantId
+                );
+
+                const route = locationHistory.routes.find(r => r.participantId === ranking.participantId);
+
+                rankingsWithRoutes.push({
+                    ...ranking,
+                    route: route?.line || '',
+                });
+            }
+
+            return {
+                statistics,
+                rankings: rankingsWithRoutes,
+            } as OrganizerSessionResultsResponseDto;
+        }
+
+        return {
+            statistics,
+            rankings,
+        } as SessionResultsResponseDto;
+    }
+
+    private mapToResponseDto(session: QuestSessionEntity): QuestSessionResponseDto {
         const questPoints = session.quest.points || [];
         const questPointCount = questPoints.length;
 

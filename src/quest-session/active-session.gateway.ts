@@ -590,6 +590,20 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
 
                 console.log(`[checkAndPassPoint] User ${userId} passed point ${nextPoint.questPointId}`);
 
+                const totalQuestPoints = questPoints.length;
+                const participantPassedPoints = passedPointIds.size + 1;
+
+                if (participantPassedPoints === totalQuestPoints && !participant.finishDate) {
+                    if (!nextPoint.task) {
+                        participant.finishDate = new Date();
+                        await this.participantRepository.save(participant);
+
+                        console.log(`[checkAndPassPoint] User ${userId} FINISHED the quest! All ${totalQuestPoints} points passed (no task on last point).`);
+                    } else {
+                        console.log(`[checkAndPassPoint] User ${userId} passed last point with task - finishDate will be set after task completion.`);
+                    }
+                }
+
                 return {
                     pointPassed: true,
                     pointName: nextPoint.name,
