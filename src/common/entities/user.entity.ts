@@ -40,6 +40,9 @@ export class UserEntity {
     @Column({ name: 'reset_password_last_request', nullable: true, type: 'timestamp' })
     resetPasswordLastRequest: Date;
 
+    @Column({ name: 'is_banned', default: false })
+    isBanned: boolean;
+
     @Column({ name: 'device_token', nullable: true, type: 'text' })
     deviceToken: string;
 

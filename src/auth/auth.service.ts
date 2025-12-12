@@ -6,6 +6,7 @@ import {
     NotFoundException,
     UnauthorizedException
 } from '@nestjs/common';
+import {UserBannedException} from '@/common/exceptions/user-banned.exception';
 import {InjectRepository} from '@nestjs/typeorm';
 import {Repository} from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -82,6 +83,10 @@ export class AuthService {
 
         const isMatch = await bcrypt.compare(dto.password, user.password);
         if (!isMatch) throw new UnauthorizedException('Invalid email or password');
+
+        if (user.isBanned) {
+            throw new UserBannedException();
+        }
 
         const payload = {sub: user.userId, email: user.email};
         const accessToken = this.jwtService.sign(payload);
