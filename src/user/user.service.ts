@@ -80,4 +80,30 @@ export class UserService {
             photoUrl: getAbsoluteUrl(this.request, user.photoUrl),
         };
     }
+
+    async registerDeviceToken(userId: number, deviceToken: string): Promise<void> {
+        const user = await this.userRepository.findOne({
+            where: {userId},
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        user.deviceToken = deviceToken;
+        await this.userRepository.save(user);
+    }
+
+    async removeDeviceToken(userId: number): Promise<void> {
+        const user = await this.userRepository.findOne({
+            where: {userId},
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        user.deviceToken = null;
+        await this.userRepository.save(user);
+    }
 }

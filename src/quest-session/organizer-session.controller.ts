@@ -12,6 +12,7 @@ import {ParticipantLocationDto} from "@/quest-session/dto/participant-location.d
 import {ParticipantScoresResponseDto} from "@/quest-session/dto/participant-scores-response.dto";
 import {ParticipantTaskService} from './participant-task.service';
 import {PendingPhotoDto, PhotoModerationActionDto, PhotoModerationResponseDto} from './dto/photo-moderation.dto';
+import {OrganizerSessionResultsResponseDto} from "@/quest-session/dto/organizer-session-results-response.dto";
 
 @ApiTags('Organizer - Quest Sessions')
 @ApiBearerAuth()
@@ -104,5 +105,13 @@ export class OrganizerSessionController {
         @GetUser('userId') userId: number,
     ): Promise<PhotoModerationResponseDto> {
         return this.participantTaskService.moderatePhoto(sessionId, photoId, userId, dto);
+    }
+
+    @Get('sessions/:id/results')
+    async getSessionResults(
+        @Param('id', ParseIntPipe) id: number,
+        @GetUser('userId') userId: number,
+    ): Promise<OrganizerSessionResultsResponseDto> {
+        return this.sessionService.getSessionResults(id, userId, true) as Promise<OrganizerSessionResultsResponseDto>;
     }
 }

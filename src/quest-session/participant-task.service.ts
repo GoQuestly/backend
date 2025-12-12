@@ -335,6 +335,12 @@ export class ParticipantTaskService {
                 passed
             );
 
+            await this.checkAndSetFinishDateIfComplete(
+                sessionId,
+                participantTask.participant.participantId,
+                pointId
+            );
+
             return {
                 success: true,
                 scoreEarned,
@@ -393,6 +399,12 @@ export class ParticipantTaskService {
             participantTask.participant.participantId,
             task,
             isCorrect
+        );
+
+        await this.checkAndSetFinishDateIfComplete(
+            sessionId,
+            participantTask.participant.participantId,
+            pointId
         );
 
         return {
@@ -668,6 +680,15 @@ export class ParticipantTaskService {
             }
 
             if (!passed) {
+                const session = await this.sessionRepository.findOne({
+                    where: { questSessionId: sessionId },
+                    relations: ['quest', 'quest.organizer'],
+                });
+
+                if (!session) {
+                    return;
+                }
+
                 const participant = await this.participantRepository.findOne({
                     where: { participantId },
                     relations: ['user'],
@@ -681,12 +702,68 @@ export class ParticipantTaskService {
                 participant.rejectionReason = RejectionReason.REQUIRED_TASK_NOT_COMPLETED;
                 await this.participantRepository.save(participant);
 
-                await this.activeSessionGateway.notifyParticipantDisqualified(sessionId, participant);
+                await this.activeSessionGateway.notifyParticipantDisqualified(sessionId, session.quest.organizer.userId, participant);
 
                 console.log(`[ParticipantTaskService] Participant ${participantId} disqualified - required task not passed`);
             }
         } catch (error) {
             console.error('[ParticipantTaskService] Error checking disqualification:', error.message);
+        }
+    }
+
+    private async checkAndSetFinishDateIfComplete(
+        sessionId: number,
+        participantId: number,
+        pointId: number
+    ): Promise<void> {
+        try {
+            const session = await this.sessionRepository.findOne({
+                where: { questSessionId: sessionId },
+                relations: ['quest', 'quest.points', 'quest.points.task'],
+            });
+
+            if (!session) {
+                return;
+            }
+
+            const participant = await this.participantRepository.findOne({
+                where: { participantId },
+                relations: ['points', 'tasks', 'tasks.photo'],
+            });
+
+            if (!participant || participant.finishDate) {
+                return;
+            }
+
+            const lastPoint = session.quest.points.reduce((max, point) =>
+                point.orderNum > max.orderNum ? point : max,
+                session.quest.points[0]
+            );
+
+            if (pointId === lastPoint.questPointId) {
+                const totalQuestPoints = session.quest.points.length;
+                const passedPointsCount = participant.points?.length || 0;
+
+                const totalQuestTasks = session.quest.points.filter(p => p.task !== null).length;
+                const completedTasksCount = participant.tasks?.filter(t => t.completedDate !== null).length || 0;
+
+                const hasUnmoderatedPhotos = participant.tasks?.some(t =>
+                    t.completedDate !== null &&
+                    t.photo &&
+                    t.photo.isApproved === null
+                ) || false;
+
+                if (passedPointsCount === totalQuestPoints &&
+                    completedTasksCount === totalQuestTasks &&
+                    !hasUnmoderatedPhotos) {
+                    participant.finishDate = new Date();
+                    await this.participantRepository.save(participant);
+
+                    console.log(`[ParticipantTaskService] User ${participantId} FINISHED the quest: passed ${passedPointsCount}/${totalQuestPoints} points, completed ${completedTasksCount}/${totalQuestTasks} tasks, all photos moderated.`);
+                }
+            }
+        } catch (error) {
+            console.error('[ParticipantTaskService] Error setting finish date:', error.message);
         }
     }
 
@@ -858,6 +935,12 @@ export class ParticipantTaskService {
             participantTask.participant.participantId,
             task,
             dto.approved
+        );
+
+        await this.checkAndSetFinishDateIfComplete(
+            sessionId,
+            participantTask.participant.participantId,
+            task.point.questPointId
         );
 
         return {
