@@ -47,4 +47,7 @@ export class ParticipantEntity {
         nullable: true
     })
     rejectionReason: RejectionReason;
+
+    @Column({ name: 'finish_date', nullable: true })
+    finishDate: Date;
 }

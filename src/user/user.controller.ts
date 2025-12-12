@@ -4,6 +4,7 @@ import {
     Patch,
     Body,
     Post,
+    Delete,
     UseGuards,
     UploadedFile,
     BadRequestException,
@@ -11,6 +12,7 @@ import {
 import {ApiTags, ApiBearerAuth} from '@nestjs/swagger';
 import {UserService} from './user.service';
 import {UpdateProfileDto} from './dto/update-profile.dto';
+import {RegisterDeviceTokenDto} from './dto/device-token.dto';
 import {JwtAuthGuard} from '@/auth/jwt-auth.guard';
 import {GetUser} from '@/auth/decorators/get-user.decorator';
 import {UserDto} from '@/common/dto/user.dto';
@@ -51,5 +53,22 @@ export class UserController {
         }
 
         return this.profileService.updateUserAvatar(userId, file.filename);
+    }
+
+    @Post('device-token')
+    async registerDeviceToken(
+        @GetUser('userId') userId: number,
+        @Body() dto: RegisterDeviceTokenDto,
+    ): Promise<{ success: boolean }> {
+        await this.profileService.registerDeviceToken(userId, dto.deviceToken);
+        return { success: true };
+    }
+
+    @Delete('device-token')
+    async removeDeviceToken(
+        @GetUser('userId') userId: number,
+    ): Promise<{ success: boolean }> {
+        await this.profileService.removeDeviceToken(userId);
+        return { success: true };
     }
 }

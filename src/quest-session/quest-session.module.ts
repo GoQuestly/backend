@@ -26,6 +26,7 @@ import {QuizAnswerEntity} from '@/common/entities/quiz-answer.entity';
 import {ParticipantTaskQuizAnswerEntity} from '@/common/entities/participant-task-quiz-answer.entity';
 import {ParticipantTaskPhotoEntity} from '@/common/entities/participant-task-photo.entity';
 import {EmailModule} from '@/email/email.module';
+import {NotificationModule} from '@/notification/notification.module';
 
 @Module({
     imports: [
@@ -48,6 +49,7 @@ import {EmailModule} from '@/email/email.module';
             secret: process.env.JWT_SECRET,
         }),
         EmailModule,
+        NotificationModule,
     ],
     controllers: [
         OrganizerSessionController,

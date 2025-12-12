@@ -36,6 +36,8 @@ export class TaskExpiryValidatorService {
                 .leftJoinAndSelect('pt.participant', 'participant')
                 .leftJoinAndSelect('participant.user', 'user')
                 .leftJoinAndSelect('participant.session', 'session')
+                .leftJoinAndSelect('session.quest', 'quest')
+                .leftJoinAndSelect('quest.organizer', 'organizer')
                 .leftJoinAndSelect('task.point', 'point')
                 .where('pt.startDate IS NOT NULL')
                 .andWhere('pt.completedDate IS NULL')
@@ -101,6 +103,7 @@ export class TaskExpiryValidatorService {
 
                     await this.activeSessionGateway.notifyParticipantDisqualified(
                         participant.session.questSessionId,
+                        participant.session.quest.organizer.userId,
                         participant
                     );
 

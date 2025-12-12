@@ -337,7 +337,7 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
         }
     }
 
-    async notifyParticipantRejected(sessionId: number, participant: any): Promise<void> {
+    async notifyParticipantRejected(sessionId: number, organizerUserId: number, participant: any): Promise<void> {
         try {
             if (!sessionId || sessionId <= 0) {
                 return;
@@ -360,7 +360,14 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
                 rejectedAt: new Date(),
             };
 
-            this.server.to(`session-${sessionId}`).emit('participant-rejected', rejectionEvent);
+            const sessionSockets = await this.server.in(`session-${sessionId}`).fetchSockets();
+
+            for (const socket of sessionSockets) {
+                const authSocket = socket as unknown as AuthenticatedSocket;
+                if (authSocket.userId === organizerUserId) {
+                    socket.emit('participant-rejected', rejectionEvent);
+                }
+            }
 
             const allSockets = await this.server.fetchSockets();
 
@@ -381,7 +388,7 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
         }
     }
 
-    async notifyParticipantDisqualified(sessionId: number, participant: any): Promise<void> {
+    async notifyParticipantDisqualified(sessionId: number, organizerUserId: number, participant: any): Promise<void> {
         try {
             if (!sessionId || sessionId <= 0) {
                 return;
@@ -404,8 +411,17 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
                 disqualifiedAt: new Date(),
             };
 
-            this.server.to(`session-${sessionId}`).emit('participant-disqualified', disqualificationEvent);
+            // Notify organizer
+            const sessionSockets = await this.server.in(`session-${sessionId}`).fetchSockets();
 
+            for (const socket of sessionSockets) {
+                const authSocket = socket as unknown as AuthenticatedSocket;
+                if (authSocket.userId === organizerUserId) {
+                    socket.emit('participant-disqualified', disqualificationEvent);
+                }
+            }
+
+            // Notify and disconnect participant
             const allSockets = await this.server.fetchSockets();
 
             const participantSockets = allSockets.filter(
@@ -455,7 +471,7 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
         try {
             const session = await this.sessionRepository.findOne({
                 where: {questSessionId: sessionId},
-                relations: ['quest', 'quest.points', 'participants', 'participants.user', 'participants.points', 'participants.points.point'],
+                relations: ['quest', 'quest.organizer', 'quest.points', 'participants', 'participants.user', 'participants.points', 'participants.points.point'],
             });
 
             if (!session) {
@@ -537,7 +553,7 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
                                 participant.rejectionReason = RejectionReason.REQUIRED_TASK_NOT_COMPLETED;
                                 await this.participantRepository.save(participant);
 
-                                await this.notifyParticipantDisqualified(sessionId, participant);
+                                await this.notifyParticipantDisqualified(sessionId, session.quest.organizer.userId, participant);
 
                                 console.log(`[checkAndPassPoint] User ${userId} disqualified - required task score ${scorePercentage.toFixed(1)}% < ${task.successScorePointsPercent}% at point ${previousPoint.questPointId}`);
                                 return null;
@@ -573,6 +589,20 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
                 await this.participantPointRepository.save(participantPoint);
 
                 console.log(`[checkAndPassPoint] User ${userId} passed point ${nextPoint.questPointId}`);
+
+                const totalQuestPoints = questPoints.length;
+                const participantPassedPoints = passedPointIds.size + 1;
+
+                if (participantPassedPoints === totalQuestPoints && !participant.finishDate) {
+                    if (!nextPoint.task) {
+                        participant.finishDate = new Date();
+                        await this.participantRepository.save(participant);
+
+                        console.log(`[checkAndPassPoint] User ${userId} FINISHED the quest! All ${totalQuestPoints} points passed (no task on last point).`);
+                    } else {
+                        console.log(`[checkAndPassPoint] User ${userId} passed last point with task - finishDate will be set after task completion.`);
+                    }
+                }
 
                 return {
                     pointPassed: true,

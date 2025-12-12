@@ -22,6 +22,8 @@ import {QuestSessionResponseDto} from "@/quest-session/dto/quest-session-respons
 import {PaginatedMySessionsResponseDto} from "@/quest-session/dto/paginated-my-sessions-response.dto";
 import {SessionPointResponseDto} from "@/quest-session/dto/session-point-response.dto";
 import {ParticipantScoresResponseDto} from "@/quest-session/dto/participant-scores-response.dto";
+import {SessionResultsResponseDto} from './dto/session-results-response.dto';
+import {ParticipantStatisticsDto} from './dto/participant-statistics.dto';
 
 @ApiTags('Participant - Quest Sessions')
 @ApiBearerAuth()
@@ -73,6 +75,21 @@ export class ParticipantSessionController {
         @GetUser('userId') userId: number,
     ): Promise<ParticipantScoresResponseDto> {
         return this.sessionService.getParticipantScores(id, userId, false, true);
+    }
+
+    @Get(':id/results')
+    async getSessionResults(
+        @Param('id', ParseIntPipe) id: number,
+        @GetUser('userId') userId: number,
+    ): Promise<SessionResultsResponseDto> {
+        return this.sessionService.getSessionResults(id, userId, false) as Promise<SessionResultsResponseDto>;
+    }
+
+    @Get('statistics')
+    async getMyStatistics(
+        @GetUser('userId') userId: number,
+    ): Promise<ParticipantStatisticsDto> {
+        return this.sessionService.getParticipantStatistics(userId);
     }
 
     @Delete(':id/leave')
