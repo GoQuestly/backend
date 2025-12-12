@@ -1,10 +1,12 @@
-import {Body, Controller, Get, HttpCode, HttpStatus, Post, Query, UseGuards, ValidationPipe,} from '@nestjs/common';
+import {Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, Query, UseGuards, ValidationPipe,} from '@nestjs/common';
 import {ApiBearerAuth, ApiTags} from '@nestjs/swagger';
 import {AdminService} from './admin.service';
 import {AdminLoginDto} from './dto/admin-login.dto';
 import {AdminLoginResponseDto} from './dto/admin-login-response.dto';
 import {GetUsersQueryDto} from './dto/get-users-query.dto';
 import {PaginatedUsersResponseDto} from './dto/paginated-users-response.dto';
+import {BanUserDto} from './dto/ban-user.dto';
+import {UnbanUserDto} from './dto/unban-user.dto';
 import {AdminJwtAuthGuard} from './guards/admin-jwt-auth.guard';
 import {GetAdmin} from './decorators/get-admin.decorator';
 
@@ -29,5 +31,21 @@ export class AdminController {
         @GetAdmin('adminId') adminId: number,
     ): Promise<PaginatedUsersResponseDto> {
         return this.adminService.getUsers(query);
+    }
+
+    @Patch('users/ban')
+    @UseGuards(AdminJwtAuthGuard)
+    @ApiBearerAuth()
+    @HttpCode(HttpStatus.NO_CONTENT)
+    async banUser(@Body() dto: BanUserDto): Promise<void> {
+        return this.adminService.banUser(dto);
+    }
+
+    @Patch('users/unban')
+    @UseGuards(AdminJwtAuthGuard)
+    @ApiBearerAuth()
+    @HttpCode(HttpStatus.NO_CONTENT)
+    async unbanUser(@Body() dto: UnbanUserDto): Promise<void> {
+        return this.adminService.unbanUser(dto);
     }
 }

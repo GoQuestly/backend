@@ -4,6 +4,7 @@ import {InjectRepository} from '@nestjs/typeorm';
 import {Repository} from 'typeorm';
 import {JwtService} from '@nestjs/jwt';
 import {UserEntity} from '@/common/entities/user.entity';
+import {UserBannedException} from '@/common/exceptions/user-banned.exception';
 
 @Injectable()
 export class GoogleAuthService {
@@ -52,11 +53,17 @@ export class GoogleAuthService {
                 isEmailVerified: true,
             });
             await this.userRepo.save(user);
-        } else if (!user.isEmailVerified) {
-            user.isEmailVerified = true;
-            user.emailVerificationCode = null;
-            user.emailVerificationCodeExpires = null;
-            await this.userRepo.save(user);
+        } else {
+            if (user.isBanned) {
+                throw new UserBannedException();
+            }
+
+            if (!user.isEmailVerified) {
+                user.isEmailVerified = true;
+                user.emailVerificationCode = null;
+                user.emailVerificationCodeExpires = null;
+                await this.userRepo.save(user);
+            }
         }
 
         return this.jwtService.sign({sub: user.userId, email});
@@ -92,11 +99,17 @@ export class GoogleAuthService {
                     isEmailVerified: true,
                 });
                 await this.userRepo.save(user);
-            } else if (!user.isEmailVerified) {
-                user.isEmailVerified = true;
-                user.emailVerificationCode = null;
-                user.emailVerificationCodeExpires = null;
-                await this.userRepo.save(user);
+            } else {
+                if (user.isBanned) {
+                    throw new UserBannedException();
+                }
+
+                if (!user.isEmailVerified) {
+                    user.isEmailVerified = true;
+                    user.emailVerificationCode = null;
+                    user.emailVerificationCodeExpires = null;
+                    await this.userRepo.save(user);
+                }
             }
 
             const accessToken = this.jwtService.sign({

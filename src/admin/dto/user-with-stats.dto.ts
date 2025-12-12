@@ -19,6 +19,9 @@ export class UserWithStatsDto {
     @ApiProperty({example: true})
     isEmailVerified: boolean;
 
+    @ApiProperty({example: false})
+    isBanned: boolean;
+
     @ApiProperty({
         example: 5,
         description: 'Number of quests created as organizer'

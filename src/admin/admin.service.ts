@@ -1,4 +1,4 @@
-import {Inject, Injectable, UnauthorizedException} from '@nestjs/common';
+import {BadRequestException, Inject, Injectable, NotFoundException, UnauthorizedException} from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
 import {Repository} from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -10,6 +10,8 @@ import {AdminLoginResponseDto} from './dto/admin-login-response.dto';
 import {GetUsersQueryDto, UserSortBy} from './dto/get-users-query.dto';
 import {PaginatedUsersResponseDto} from './dto/paginated-users-response.dto';
 import {UserWithStatsDto} from './dto/user-with-stats.dto';
+import {BanUserDto} from './dto/ban-user.dto';
+import {UnbanUserDto} from './dto/unban-user.dto';
 import {getAbsoluteUrl} from '@/common/utils/url.util';
 import {REQUEST} from '@nestjs/core';
 import {Request} from 'express';
@@ -104,6 +106,7 @@ export class AdminService {
             .addSelect('user.name', 'name')
             .addSelect('user.photoUrl', 'photoUrl')
             .addSelect('user.isEmailVerified', 'isEmailVerified')
+            .addSelect('user.isBanned', 'isBanned')
             .addSelect('COUNT(DISTINCT quest.questId)', 'questCount')
             .addSelect('COUNT(DISTINCT participation.participantId)', 'sessionCount')
             .where('user.userId IN (:...userIds)', {userIds})
@@ -111,7 +114,8 @@ export class AdminService {
             .addGroupBy('user.email')
             .addGroupBy('user.name')
             .addGroupBy('user.photoUrl')
-            .addGroupBy('user.isEmailVerified');
+            .addGroupBy('user.isEmailVerified')
+            .addGroupBy('user.isBanned');
 
         if (sortBy === UserSortBy.NAME) {
             usersQb.orderBy('user.name', sortOrder);
@@ -127,6 +131,7 @@ export class AdminService {
             name: row.name,
             photoUrl: getAbsoluteUrl(this.request, row.photoUrl),
             isEmailVerified: row.isEmailVerified,
+            isBanned: row.isBanned,
             questCount: parseInt(row.questCount, 10) || 0,
             sessionCount: parseInt(row.sessionCount, 10) || 0,
         }));
@@ -137,5 +142,39 @@ export class AdminService {
             pageNumber,
             pageSize,
         };
+    }
+
+    async banUser(dto: BanUserDto): Promise<void> {
+        const user = await this.userRepo.findOne({
+            where: { userId: dto.userId }
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        if (user.isBanned) {
+            throw new BadRequestException('User is already banned');
+        }
+
+        user.isBanned = true;
+        await this.userRepo.save(user);
+    }
+
+    async unbanUser(dto: UnbanUserDto): Promise<void> {
+        const user = await this.userRepo.findOne({
+            where: { userId: dto.userId }
+        });
+
+        if (!user) {
+            throw new NotFoundException('User not found');
+        }
+
+        if (!user.isBanned) {
+            throw new BadRequestException('User is not banned');
+        }
+
+        user.isBanned = false;
+        await this.userRepo.save(user);
     }
 }
