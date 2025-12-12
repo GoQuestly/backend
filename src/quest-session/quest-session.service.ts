@@ -36,6 +36,7 @@ import {ParticipantRankingDto} from "@/quest-session/dto/participant-ranking.dto
 import {OrganizerSessionResultsResponseDto} from "@/quest-session/dto/organizer-session-results-response.dto";
 import {SessionStatisticsDto} from "@/quest-session/dto/session-statistics.dto";
 import {ParticipantRankingWithRouteDto} from "@/quest-session/dto/participant-ranking-with-route.dto";
+import {ParticipantStatisticsDto} from "@/quest-session/dto/participant-statistics.dto";
 
 @Injectable()
 export class QuestSessionService {
@@ -819,6 +820,104 @@ export class QuestSessionService {
             participantCount: session.participants?.length || 0,
             questPointCount,
             passedQuestPointCount,
+        };
+    }
+
+    async getParticipantStatistics(userId: number): Promise<ParticipantStatisticsDto> {
+        const participants = await this.participantRepository.find({
+            where: { user: { userId } },
+            relations: ['session', 'session.quest', 'session.participants', 'points', 'tasks'],
+        });
+
+        let totalSessions = 0;
+        let finishedSessions = 0;
+        let totalScore = 0;
+        let totalCheckpointsPassed = 0;
+        let totalTasksCompleted = 0;
+        let rejectedSessions = 0;
+        let disqualifiedSessions = 0;
+        const ranks: number[] = [];
+
+        for (const participant of participants) {
+            totalSessions++;
+
+            if (participant.participationStatus === ParticipantStatus.REJECTED) {
+                rejectedSessions++;
+                continue;
+            }
+
+            if (participant.participationStatus === ParticipantStatus.DISQUALIFIED) {
+                disqualifiedSessions++;
+                continue;
+            }
+
+            if (participant.participationStatus === ParticipantStatus.APPROVED) {
+                const completedTasks = participant.tasks?.filter(t => t.completedDate !== null) || [];
+                const taskScore = completedTasks.reduce((sum, task) => sum + (task.scoreEarned || 0), 0);
+                totalScore += taskScore;
+
+                const checkpointsPassed = participant.points?.length || 0;
+                totalCheckpointsPassed += checkpointsPassed;
+
+                totalTasksCompleted += completedTasks.length;
+
+                if (participant.finishDate && participant.session.endReason) {
+                    finishedSessions++;
+
+                    const sessionParticipants = participant.session.participants
+                        .filter(p => p.participationStatus === ParticipantStatus.APPROVED)
+                        .map(p => {
+                            const pCompletedTasks = p.tasks?.filter(t => t.completedDate !== null) || [];
+                            const pTotalScore = pCompletedTasks.reduce((sum, task) => sum + (task.scoreEarned || 0), 0);
+                            const pCheckpointsPassed = p.points?.length || 0;
+                            const pFinished = p.finishDate !== null;
+
+                            return {
+                                participantId: p.participantId,
+                                totalScore: pTotalScore,
+                                checkpointsPassed: pCheckpointsPassed,
+                                finished: pFinished,
+                            };
+                        });
+
+                    sessionParticipants.sort((a, b) => {
+                        if (a.finished && !b.finished) return -1;
+                        if (!a.finished && b.finished) return 1;
+
+                        if (a.checkpointsPassed !== b.checkpointsPassed) {
+                            return b.checkpointsPassed - a.checkpointsPassed;
+                        }
+
+                        if (a.totalScore !== b.totalScore) {
+                            return b.totalScore - a.totalScore;
+                        }
+
+                        return 0;
+                    });
+
+                    const rank = sessionParticipants.findIndex(p => p.participantId === participant.participantId) + 1;
+                    if (rank > 0) {
+                        ranks.push(rank);
+                    }
+                }
+            }
+        }
+
+        const finishRate = totalSessions > 0 ? (finishedSessions / totalSessions) * 100 : 0;
+        const averageRank = ranks.length > 0 ? ranks.reduce((sum, rank) => sum + rank, 0) / ranks.length : null;
+        const bestRank = ranks.length > 0 ? Math.min(...ranks) : null;
+
+        return {
+            totalSessions,
+            finishedSessions,
+            finishRate: Math.round(finishRate * 100) / 100,
+            averageRank: averageRank !== null ? Math.round(averageRank * 100) / 100 : null,
+            bestRank,
+            totalScore,
+            totalCheckpointsPassed,
+            totalTasksCompleted,
+            rejectedSessions,
+            disqualifiedSessions,
         };
     }
 }
