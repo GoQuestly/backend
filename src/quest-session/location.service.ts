@@ -19,6 +19,7 @@ import {ParticipantLocationDto} from "@/quest-session/dto/participant-location.d
 import {LocationHistoryResponseDto} from "@/quest-session/dto/location-history-response.dto";
 import {ParticipantRouteDto} from "@/quest-session/dto/participant-route.dto";
 import {ActiveSessionGateway} from './active-session.gateway';
+import {NotificationService} from '@/notification/notification.service';
 import {calculateDistance} from "@/quest-session/participant-task.constants";
 
 @Injectable()
@@ -32,6 +33,7 @@ export class LocationService {
         private sessionRepository: Repository<QuestSessionEntity>,
         @Inject(forwardRef(() => ActiveSessionGateway))
         private locationGateway: ActiveSessionGateway,
+        private notificationService: NotificationService,
     ) {}
 
     async updateLocation(
@@ -241,6 +243,12 @@ export class LocationService {
                 await this.participantRepository.save(participant);
 
                 await this.locationGateway.notifyParticipantRejected(sessionId, session.quest.organizer.userId, participant);
+
+                await this.notificationService.sendRejectionNotification(
+                    participant,
+                    sessionId,
+                    session.quest.title
+                );
             }
         }
     }

@@ -40,6 +40,9 @@ export class UserEntity {
     @Column({ name: 'reset_password_last_request', nullable: true, type: 'timestamp' })
     resetPasswordLastRequest: Date;
 
+    @Column({ name: 'device_token', nullable: true, type: 'text' })
+    deviceToken: string;
+
     @OneToMany(() => QuestEntity, (quest) => quest.organizer)
     quests: QuestEntity[];
 

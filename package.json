@@ -29,6 +29,7 @@
     "@nestjs/typeorm": "^11.0.0",
     "@nestjs/websockets": "^11.1.8",
     "class-transformer": "^0.5.1",
+    "firebase-admin": "^13.6.0",
     "google-auth-library": "^10.4.0",
     "multer": "^2.0.2",
     "nodemailer": "^7.0.9",

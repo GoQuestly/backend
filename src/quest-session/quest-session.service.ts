@@ -28,6 +28,7 @@ import {SessionResultsResponseDto} from './dto/session-results-response.dto';
 import {SessionEventsGateway} from './session-events.gateway';
 import {ActiveSessionGateway} from './active-session.gateway';
 import {LocationService} from './location.service';
+import {NotificationService} from '@/notification/notification.service';
 import {REQUEST} from '@nestjs/core';
 import {Request} from 'express';
 import {getAbsoluteUrl} from '@/common/utils/url.util';
@@ -53,6 +54,7 @@ export class QuestSessionService {
         private activeSessionGateway: ActiveSessionGateway,
         @Inject(forwardRef(() => LocationService))
         private locationService: LocationService,
+        private notificationService: NotificationService,
         @Inject(REQUEST) private readonly request: Request,
     ) {}
 
@@ -309,6 +311,12 @@ export class QuestSessionService {
             this.activeSessionGateway.notifySessionCancelled(id, organizerName),
             this.participantGateway.notifySessionCancelled(id, organizerName),
         ]);
+
+        await this.notificationService.sendSessionCancelledNotificationToMultiple(
+            session.participants,
+            id,
+            session.quest.title
+        );
 
         return this.findById(id);
     }

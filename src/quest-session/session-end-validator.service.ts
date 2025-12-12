@@ -3,7 +3,9 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { QuestSessionEntity } from '@/common/entities/quest-session.entity';
+import { ParticipantEntity } from '@/common/entities/participant.entity';
 import { LocationService } from './location.service';
+import { NotificationService } from '@/notification/notification.service';
 import { ParticipantStatus } from '@/common/enums/participant-status';
 import { QuestSessionEndReason } from '@/common/enums/quest-session-end-reason';
 
@@ -14,7 +16,10 @@ export class SessionEndValidatorService {
     constructor(
         @InjectRepository(QuestSessionEntity)
         private sessionRepository: Repository<QuestSessionEntity>,
+        @InjectRepository(ParticipantEntity)
+        private participantRepository: Repository<ParticipantEntity>,
         private locationService: LocationService,
+        private notificationService: NotificationService,
     ) {
     }
 
@@ -76,6 +81,8 @@ export class SessionEndValidatorService {
                 await this.locationService.rejectParticipantsWithoutLocation(
                     session.questSessionId
                 );
+
+                await this.sendSessionEndNotifications(session.questSessionId);
             } catch (error) {
                 this.logger.error(
                     `Failed to end session ${session.questSessionId}: ${error.message}`,
@@ -167,6 +174,8 @@ export class SessionEndValidatorService {
                         session.questSessionId
                     );
 
+                    await this.sendSessionEndNotifications(session.questSessionId);
+
                     continue;
                 }
 
@@ -195,6 +204,8 @@ export class SessionEndValidatorService {
                     await this.locationService.rejectParticipantsWithoutLocation(
                         session.questSessionId
                     );
+
+                    await this.sendSessionEndNotifications(session.questSessionId);
                 }
 
             } catch (error) {
@@ -203,6 +214,80 @@ export class SessionEndValidatorService {
                     error.stack
                 );
             }
+        }
+    }
+
+    private async sendSessionEndNotifications(sessionId: number): Promise<void> {
+        try {
+            const session = await this.sessionRepository.findOne({
+                where: { questSessionId: sessionId },
+                relations: [
+                    'quest',
+                    'participants',
+                    'participants.user',
+                    'participants.points',
+                    'participants.tasks',
+                ],
+            });
+
+            if (!session) {
+                this.logger.warn(`Session ${sessionId} not found for end notifications`);
+                return;
+            }
+
+            const approvedParticipants = session.participants
+                .filter(p => p.participationStatus === ParticipantStatus.APPROVED)
+                .map(p => {
+                    const completedTasks = p.tasks?.filter(t => t.completedDate !== null) || [];
+                    const totalScore = completedTasks.reduce((sum, task) => sum + (task.scoreEarned || 0), 0);
+                    const passedCheckpointsCount = p.points?.length || 0;
+                    const finished = p.finishDate !== null;
+
+                    return {
+                        participant: p,
+                        totalScore,
+                        passedCheckpointsCount,
+                        finished,
+                    };
+                });
+
+            approvedParticipants.sort((a, b) => {
+                if (a.finished && !b.finished) return -1;
+                if (!a.finished && b.finished) return 1;
+
+                if (a.passedCheckpointsCount !== b.passedCheckpointsCount) {
+                    return b.passedCheckpointsCount - a.passedCheckpointsCount;
+                }
+
+                if (a.totalScore !== b.totalScore) {
+                    return b.totalScore - a.totalScore;
+                }
+
+                return 0;
+            });
+
+            for (let i = 0; i < approvedParticipants.length; i++) {
+                const { participant, totalScore, finished } = approvedParticipants[i];
+                const rank = i + 1;
+
+                await this.notificationService.sendSessionEndedNotification(
+                    participant,
+                    sessionId,
+                    session.quest.title,
+                    finished,
+                    finished ? rank : undefined,
+                    finished ? totalScore : undefined
+                );
+            }
+
+            this.logger.log(
+                `Sent session end notifications to ${approvedParticipants.length} participants for session ${sessionId}`
+            );
+        } catch (error) {
+            this.logger.error(
+                `Failed to send session end notifications for session ${sessionId}: ${error.message}`,
+                error.stack
+            );
         }
     }
 }
