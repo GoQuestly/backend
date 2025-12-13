@@ -59,17 +59,13 @@ export class SessionReminderScheduler {
                 continue;
             }
 
-            const approvedParticipants = session.participants.filter(
-                p => p.participationStatus === ParticipantStatus.APPROVED
-            );
-
             const earlyReminderCutoff = new Date(session.startDate.getTime() - EARLY_REMINDER_MS);
 
-            const eligibleParticipants = approvedParticipants.filter(
+            const eligibleParticipants = session.participants.filter(
                 p => p.createdAt <= earlyReminderCutoff
             );
 
-            const skippedCount = approvedParticipants.length - eligibleParticipants.length;
+            const skippedCount = session.participants.length - eligibleParticipants.length;
             if (skippedCount > 0) {
                 this.logger.log(
                     `Skipping ${skippedCount} participants who joined less than ${EARLY_REMINDER_MINUTES} minutes before start`
@@ -113,17 +109,13 @@ export class SessionReminderScheduler {
                 continue;
             }
 
-            const approvedParticipants = session.participants.filter(
-                p => p.participationStatus === ParticipantStatus.APPROVED
-            );
-
             this.logger.log(
-                `Sending start notifications for session ${session.questSessionId} to ${approvedParticipants.length} participants`
+                `Sending start notifications for session ${session.questSessionId} to ${session.participants.length} participants`
             );
 
-            if (approvedParticipants.length > 0) {
+            if (session.participants.length > 0) {
                 const participantEntities = await this.participantRepository.find({
-                    where: approvedParticipants.map(p => ({ participantId: p.participantId })),
+                    where: session.participants.map(p => ({ participantId: p.participantId })),
                     relations: ['user'],
                 });
 
