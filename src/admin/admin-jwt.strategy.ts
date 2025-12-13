@@ -29,6 +29,6 @@ export class AdminJwtStrategy extends PassportStrategy(Strategy, 'admin-jwt') {
             throw new UnauthorizedException('Invalid admin token');
         }
 
-        return {adminId: admin.adminId, email: admin.email};
+        return {adminId: admin.adminId, email: admin.email, role: payload.role || 'admin'};
     }
 }

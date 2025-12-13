@@ -629,7 +629,8 @@ export class QuestSessionService {
     async getSessionResults(
         sessionId: number,
         userId: number,
-        requireOrganizer: boolean = false
+        requireOrganizer: boolean = false,
+        requireParticipant: boolean = false
     ): Promise<SessionResultsResponseDto | OrganizerSessionResultsResponseDto> {
         const session = await this.sessionRepository.findOne({
             where: { questSessionId: sessionId },
@@ -656,12 +657,21 @@ export class QuestSessionService {
         const participant = session.participants.find(p => p.user.userId === userId);
         const isParticipant = !!participant;
 
-        if (requireOrganizer && !isOrganizer) {
-            throw new ForbiddenException('Only the quest organizer can access this endpoint');
-        }
-
-        if (!requireOrganizer && !isOrganizer && !isParticipant) {
-            throw new ForbiddenException('You do not have access to this session');
+        if (requireOrganizer) {
+            if (!isOrganizer) {
+                throw new ForbiddenException('Only the quest organizer can access this endpoint');
+            }
+        } else if (requireParticipant) {
+            if (isOrganizer) {
+                throw new ForbiddenException('Only quest participants can access this endpoint');
+            }
+            if (!isParticipant) {
+                throw new ForbiddenException('You do not have access to this session');
+            }
+        } else {
+            if (!isOrganizer && !isParticipant) {
+                throw new ForbiddenException('You do not have access to this session');
+            }
         }
 
         const sessionDurationSeconds = session.endDate

@@ -67,7 +67,7 @@ export class AuthService {
         });
         const savedUser = await this.userRepo.save(user);
 
-        const payload = {sub: savedUser.userId, email: savedUser.email};
+        const payload = {sub: savedUser.userId, email: savedUser.email, role: 'user'};
         const token = this.jwtService.sign(payload);
 
         return {
@@ -88,7 +88,7 @@ export class AuthService {
             throw new UserBannedException();
         }
 
-        const payload = {sub: user.userId, email: user.email};
+        const payload = {sub: user.userId, email: user.email, role: 'user'};
         const accessToken = this.jwtService.sign(payload);
 
         return {

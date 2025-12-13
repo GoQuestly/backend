@@ -89,7 +89,7 @@ export class ParticipantSessionController {
         @Param('id', ParseIntPipe) id: number,
         @GetUser('userId') userId: number,
     ): Promise<SessionResultsResponseDto> {
-        return this.sessionService.getSessionResults(id, userId, false) as Promise<SessionResultsResponseDto>;
+        return this.sessionService.getSessionResults(id, userId, false, true) as Promise<SessionResultsResponseDto>;
     }
 
     @Delete(':id/leave')
