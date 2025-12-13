@@ -4,6 +4,8 @@ export const NOTIFICATION_TYPES = {
     SESSION_ENDED: 'session_ended',
     PARTICIPANT_REJECTED: 'participant_rejected',
     SESSION_CANCELLED: 'session_cancelled',
+    PHOTO_APPROVED: 'photo_approved',
+    PHOTO_REJECTED: 'photo_rejected',
 } as const;
 
 export const NOTIFICATION_MESSAGES = {
@@ -41,5 +43,15 @@ export const NOTIFICATION_MESSAGES = {
         title: 'Quest Cancelled',
         body: (questTitle: string) =>
             `The organizer has cancelled quest "${questTitle}".`,
+    },
+    PHOTO_APPROVED: {
+        title: 'Photo Approved!',
+        body: (questTitle: string, taskDescription: string, pointsEarned: number) =>
+            `Your photo for task "${taskDescription}" in quest "${questTitle}" has been approved! +${pointsEarned} points`,
+    },
+    PHOTO_REJECTED: {
+        title: 'Photo Rejected',
+        body: (questTitle: string, taskDescription: string, rejectionReason?: string) =>
+            `Your photo for task "${taskDescription}" in quest "${questTitle}" was rejected${rejectionReason ? `: ${rejectionReason}` : '.'}`,
     },
 } as const;

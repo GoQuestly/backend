@@ -169,4 +169,48 @@ export class NotificationService {
             },
         });
     }
+
+    async sendPhotoModerationNotification(
+        userId: number,
+        sessionId: number,
+        questTitle: string,
+        taskDescription: string,
+        approved: boolean,
+        pointsEarned: number,
+        totalScore: number,
+        rejectionReason?: string
+    ): Promise<void> {
+        const user = await this.userRepository.findOne({
+            where: { userId },
+        });
+
+        if (!user?.deviceToken) {
+            return;
+        }
+
+        const notificationType = approved ? NOTIFICATION_TYPES.PHOTO_APPROVED : NOTIFICATION_TYPES.PHOTO_REJECTED;
+        let title: string;
+        let body: string;
+
+        if (approved) {
+            title = NOTIFICATION_MESSAGES.PHOTO_APPROVED.title;
+            body = NOTIFICATION_MESSAGES.PHOTO_APPROVED.body(questTitle, taskDescription, pointsEarned);
+        } else {
+            title = NOTIFICATION_MESSAGES.PHOTO_REJECTED.title;
+            body = NOTIFICATION_MESSAGES.PHOTO_REJECTED.body(questTitle, taskDescription, rejectionReason);
+        }
+
+        await this.fcmService.sendNotification(user.deviceToken, {
+            data: {
+                type: notificationType,
+                sessionId: sessionId.toString(),
+                approved: approved.toString(),
+                pointsEarned: pointsEarned.toString(),
+                totalScore: totalScore.toString(),
+                title,
+                body,
+                ...(rejectionReason && { rejectionReason }),
+            },
+        });
+    }
 }

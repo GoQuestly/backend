@@ -35,6 +35,7 @@ import {RejectionReason} from '@/common/enums/rejection-reason';
 import {TaskCompletionResponseDto} from "@/quest-session/dto/task-completion-response.dto";
 import {SubmitCodeWordTaskDto} from "@/quest-session/dto/submit-code-word-task.dto";
 import {QuizAnswerResponseDto} from "@/quest-session/dto/quiz-answer-response.dto";
+import {NotificationService} from '@/notification/notification.service';
 
 @Injectable()
 export class ParticipantTaskService {
@@ -55,6 +56,7 @@ export class ParticipantTaskService {
         private participantRepository: Repository<ParticipantEntity>,
         @Inject(forwardRef(() => ActiveSessionGateway))
         private activeSessionGateway: ActiveSessionGateway,
+        private notificationService: NotificationService,
     ) {
     }
 
@@ -908,6 +910,17 @@ export class ParticipantTaskService {
                 scoreAdjustment,
                 totalScore,
             }
+        );
+
+        await this.notificationService.sendPhotoModerationNotification(
+            participantTask.participant.user.userId,
+            sessionId,
+            session.quest.title,
+            task.description,
+            dto.approved,
+            scoreAdjustment,
+            totalScore,
+            dto.rejectionReason
         );
 
         const allParticipants = await this.participantRepository.find({
