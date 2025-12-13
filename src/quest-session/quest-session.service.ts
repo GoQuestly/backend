@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
 import {isSessionActive} from '@/common/utils/session.util';
-import {Repository} from 'typeorm';
+import {IsNull, Not, Repository} from 'typeorm';
 import {QuestSessionEntity} from '@/common/entities/quest-session.entity';
 import {ParticipantEntity} from '@/common/entities/participant.entity';
 import {QuestEntity} from '@/common/entities/quest.entity';
@@ -92,14 +92,10 @@ export class QuestSessionService {
         const questDurationMs = quest.maxDurationMinutes * 60 * 1000;
 
         const existingSessions = await this.sessionRepository.find({
-            where: { quest: { questId } },
+            where: { quest: { questId }, endDate: IsNull() },
         });
 
         for (const existingSession of existingSessions) {
-            if (existingSession.endReason !== null) {
-                continue;
-            }
-
             const existingStart = existingSession.startDate.getTime();
             const newStart = startDate.getTime();
 
@@ -262,7 +258,7 @@ export class QuestSessionService {
         const questDurationMs = session.quest.maxDurationMinutes * 60 * 1000;
 
         const existingSessions = await this.sessionRepository.find({
-            where: { quest: { questId: session.quest.questId } },
+            where: { quest: { questId: session.quest.questId }, endDate: IsNull() },
         });
 
         for (const existingSession of existingSessions) {
