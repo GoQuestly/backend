@@ -96,7 +96,7 @@ export class SessionEndValidatorService {
         const sessions = await this.sessionRepository
             .createQueryBuilder('session')
             .leftJoinAndSelect('session.participants', 'participants')
-            .where('session.endReason IS NULL')
+            .where('session.endDate IS NULL')
             .andWhere('session.startDate BETWEEN :oneMinuteAgo AND :now', { oneMinuteAgo, now })
             .getMany();
 
@@ -107,12 +107,6 @@ export class SessionEndValidatorService {
         this.logger.log(`Checking ${sessions.length} newly started sessions for participants`);
 
         for (const session of sessions) {
-            this.logger.log('Session participants:', session.participants.map(
-                p => ({
-                    participantId: p.participantId,
-                    status: p.participationStatus,
-                }
-            )));
             const nonRejectedParticipants = session.participants.filter(
                 p => p.participationStatus !== ParticipantStatus.REJECTED
             );
@@ -146,7 +140,7 @@ export class SessionEndValidatorService {
             .leftJoinAndSelect('participants.points', 'participantPoints')
             .leftJoinAndSelect('participants.tasks', 'participantTasks')
             .leftJoinAndSelect('participantTasks.photo', 'participantTaskPhoto')
-            .where('session.endReason IS NULL')
+            .where('session.endDate IS NULL')
             .andWhere('session.startDate <= :now', { now })
             .getMany();
 
@@ -168,7 +162,7 @@ export class SessionEndValidatorService {
                 const totalQuestPoints = session.quest.points.length;
                 const totalQuestTasks = session.quest.points.filter(p => p.task !== null).length;
                 const approvedParticipants = session.participants.filter(
-                    p => p.participationStatus === ParticipantStatus.APPROVED
+                    p => p.participationStatus === ParticipantStatus.APPROVED || p.participationStatus === ParticipantStatus.PENDING
                 );
 
                 if (approvedParticipants.length === 0) {
