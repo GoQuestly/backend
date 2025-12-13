@@ -20,10 +20,11 @@ import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import { EmailModule } from "@/email/email.module";
 import { QuestModule } from './quest/quest.module';
+import { AdminModule } from './admin/admin.module';
 import { QuestPointModule } from "@/quest-point/quest-point.module";
 import { QuestTaskModule } from "@/quest-task/quest-task.module";
-import { QuestSessionModule } from "@/quest-session/quest-session.module";
 import { NotificationModule } from "@/notification/notification.module";
+import { QuestSessionModule } from "@/quest-session/quest-session.module";
 import { ServerTimeController } from "@/common/server-time.controller";
 
 @Module({
@@ -50,6 +51,7 @@ import { ServerTimeController } from "@/common/server-time.controller";
         ScheduleModule.forRoot(),
         UserModule,
         AuthModule,
+        AdminModule,
         EmailModule,
         UserModule,
         QuestModule,
