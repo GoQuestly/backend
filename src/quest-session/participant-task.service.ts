@@ -70,7 +70,7 @@ export class ParticipantTaskService {
         const {session, participant} = await this.getSessionWithParticipant(sessionId, userId);
         const point = await this.getPointWithTask(pointId, session.quest.questId);
 
-        await this.validatePointAccess(point, participant, session.quest.points, pointId, 'accessing');
+        await this.validatePointAccess(participant, pointId, 'accessing');
 
         const participantTask = await this.participantTaskRepository.findOne({
             where: {
@@ -152,7 +152,7 @@ export class ParticipantTaskService {
         const {session, participant} = await this.getSessionWithParticipant(sessionId, userId);
         const point = await this.getPointWithTask(pointId, session.quest.questId, false);
 
-        await this.validatePointAccess(point, participant, session.quest.points, pointId, 'starting');
+        await this.validatePointAccess(participant, pointId, 'starting');
 
         const existingTask = await this.participantTaskRepository.findOne({
             where: {
@@ -520,14 +520,10 @@ export class ParticipantTaskService {
     }
 
     private async validatePointAccess(
-        point: QuestPointEntity,
         participant: any,
-        questPoints: QuestPointEntity[],
         pointId: number,
         action: string
     ): Promise<void> {
-        const sortedPoints = [...(questPoints || [])].sort((a, b) => a.orderNum - b.orderNum);
-
         const passedPoints = await this.participantPointRepository.find({
             where: {
                 participant: { participantId: participant.participantId }
@@ -541,17 +537,6 @@ export class ParticipantTaskService {
 
         if (!passedPointIds.has(pointId)) {
             throw new BadRequestException(`You must reach the point location first before ${action} its task`);
-        }
-
-        let maxPassedOrderNum = -1;
-        for (const qp of sortedPoints) {
-            if (passedPointIds.has(qp.questPointId)) {
-                maxPassedOrderNum = Math.max(maxPassedOrderNum, qp.orderNum);
-            }
-        }
-
-        if (point.orderNum !== maxPassedOrderNum) {
-            throw new BadRequestException(`You can only ${action === 'accessing' ? 'access' : action === 'starting' ? 'start' : 'submit'} the task for your current point`);
         }
     }
 
@@ -598,7 +583,7 @@ export class ParticipantTaskService {
             throw new BadRequestException(`Expected task type ${expectedTaskType} but got ${point.task.taskType}`);
         }
 
-        await this.validatePointAccess(point, participant, session.quest.points, pointId, 'submitting');
+        await this.validatePointAccess(participant, pointId, 'submitting');
 
         const participantTask = await this.participantTaskRepository.findOne({
             where: {
