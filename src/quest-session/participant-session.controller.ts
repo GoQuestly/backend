@@ -53,6 +53,13 @@ export class ParticipantSessionController {
         return this.sessionService.findUserSessions(userId, finalLimit, offset);
     }
 
+    @Get('statistics')
+    async getMyStatistics(
+        @GetUser('userId') userId: number,
+    ): Promise<ParticipantStatisticsDto> {
+        return this.sessionService.getParticipantStatistics(userId);
+    }
+
     @Get(':id')
     async findById(
         @Param('id', ParseIntPipe) id: number,
@@ -83,13 +90,6 @@ export class ParticipantSessionController {
         @GetUser('userId') userId: number,
     ): Promise<SessionResultsResponseDto> {
         return this.sessionService.getSessionResults(id, userId, false) as Promise<SessionResultsResponseDto>;
-    }
-
-    @Get('statistics')
-    async getMyStatistics(
-        @GetUser('userId') userId: number,
-    ): Promise<ParticipantStatisticsDto> {
-        return this.sessionService.getParticipantStatistics(userId);
     }
 
     @Delete(':id/leave')

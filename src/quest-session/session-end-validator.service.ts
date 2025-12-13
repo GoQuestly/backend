@@ -107,8 +107,12 @@ export class SessionEndValidatorService {
         this.logger.log(`Checking ${sessions.length} newly started sessions for participants`);
 
         for (const session of sessions) {
-            if (session.participants.length === 0) {
-                this.logger.log(`Session ${session.questSessionId} started with no participants - ending immediately`);
+            const nonRejectedParticipants = session.participants.filter(
+                p => p.participationStatus !== ParticipantStatus.REJECTED
+            );
+
+            if (nonRejectedParticipants.length === 0) {
+                this.logger.log(`Session ${session.questSessionId} started with no non-rejected participants - ending immediately`);
 
                 try {
                     session.endReason = QuestSessionEndReason.FINISHED;

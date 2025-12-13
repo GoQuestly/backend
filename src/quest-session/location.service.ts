@@ -219,7 +219,7 @@ export class LocationService {
     async rejectParticipantsWithoutLocation(sessionId: number) {
         const session = await this.sessionRepository.findOne({
             where: { questSessionId: sessionId },
-            relations: ['quest', 'participants', 'participants.user'],
+            relations: ['quest', 'quest.organizer', 'participants', 'participants.user'],
         });
 
         if (!session) {
