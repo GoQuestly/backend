@@ -16,7 +16,7 @@ import {ParticipantPointEntity} from '@/common/entities/participant-point.entity
 import {ParticipantEntity} from '@/common/entities/participant.entity';
 import {ParticipantTaskEntity} from '@/common/entities/participant-task.entity';
 import {RejectionReason} from '@/common/enums/rejection-reason';
-import {calculateDistance, POINT_COMPLETION_RADIUS_METERS} from './participant-task.constants';
+import {calculateDistance, POINT_COMPLETION_RADIUS_METERS, POSTGRES_UNIQUE_VIOLATION_ERROR_CODE} from './participant-task.constants';
 import {isSessionActive} from '@/common/utils/session.util';
 
 @WebSocketGateway({
@@ -606,7 +606,23 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
                     passedDate: new Date(),
                 });
 
-                await this.participantPointRepository.save(participantPoint);
+                try {
+                    await this.participantPointRepository.save(participantPoint);
+                } catch (error) {
+                    const isDuplicateError =
+                        error?.code === POSTGRES_UNIQUE_VIOLATION_ERROR_CODE ||
+                        error?.constraint?.includes('participant') ||
+                        error?.message?.toLowerCase().includes('duplicate') ||
+                        error?.message?.toLowerCase().includes('unique');
+
+                    if (isDuplicateError) {
+                        console.log(`[checkAndPassPoint] Point ${nextPoint.questPointId} already passed by user ${userId} (caught race condition)`);
+                        return null;
+                    }
+
+                    console.error(`[checkAndPassPoint] Unexpected error saving point:`, error);
+                    throw error;
+                }
 
                 console.log(`[checkAndPassPoint] User ${userId} passed point ${nextPoint.questPointId}`);
 

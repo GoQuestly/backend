@@ -1,8 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, Unique } from 'typeorm';
 import { ParticipantEntity } from './participant.entity';
 import { QuestPointEntity } from './quest-point.entity';
 
 @Entity('participant_points')
+@Unique(['participant', 'point'])
 export class ParticipantPointEntity {
     @PrimaryGeneratedColumn({ name: "participant_point_id"})
     participantPointId: number;

@@ -1,5 +1,8 @@
 export const POINT_COMPLETION_RADIUS_METERS = 30;
 
+// PostgreSQL error codes
+export const POSTGRES_UNIQUE_VIOLATION_ERROR_CODE = '23505';
+
 export function calculateDistance(
     lat1: number,
     lon1: number,

@@ -31,6 +31,7 @@ import {ActiveSessionGateway} from './active-session.gateway';
 import {ParticipantStatus} from '@/common/enums/participant-status';
 import {PendingPhotoDto, PhotoModerationActionDto, PhotoModerationResponseDto} from './dto/photo-moderation.dto';
 import {ParticipantEntity} from '@/common/entities/participant.entity';
+import {ParticipantPointEntity} from '@/common/entities/participant-point.entity';
 import {RejectionReason} from '@/common/enums/rejection-reason';
 import {TaskCompletionResponseDto} from "@/quest-session/dto/task-completion-response.dto";
 import {SubmitCodeWordTaskDto} from "@/quest-session/dto/submit-code-word-task.dto";
@@ -54,6 +55,8 @@ export class ParticipantTaskService {
         private participantTaskPhotoRepository: Repository<ParticipantTaskPhotoEntity>,
         @InjectRepository(ParticipantEntity)
         private participantRepository: Repository<ParticipantEntity>,
+        @InjectRepository(ParticipantPointEntity)
+        private participantPointRepository: Repository<ParticipantPointEntity>,
         @Inject(forwardRef(() => ActiveSessionGateway))
         private activeSessionGateway: ActiveSessionGateway,
         private notificationService: NotificationService,
@@ -64,7 +67,7 @@ export class ParticipantTaskService {
         const {session, participant} = await this.getSessionWithParticipant(sessionId, userId);
         const point = await this.getPointWithTask(pointId, session.quest.questId);
 
-        this.validatePointAccess(point, participant, session.quest.points, pointId, 'accessing');
+        await this.validatePointAccess(point, participant, session.quest.points, pointId, 'accessing');
 
         const participantTask = await this.participantTaskRepository.findOne({
             where: {
@@ -146,7 +149,7 @@ export class ParticipantTaskService {
         const {session, participant} = await this.getSessionWithParticipant(sessionId, userId);
         const point = await this.getPointWithTask(pointId, session.quest.questId, false);
 
-        this.validatePointAccess(point, participant, session.quest.points, pointId, 'starting');
+        await this.validatePointAccess(point, participant, session.quest.points, pointId, 'starting');
 
         const existingTask = await this.participantTaskRepository.findOne({
             where: {
@@ -509,16 +512,24 @@ export class ParticipantTaskService {
         return point;
     }
 
-    private validatePointAccess(
+    private async validatePointAccess(
         point: QuestPointEntity,
         participant: any,
         questPoints: QuestPointEntity[],
         pointId: number,
         action: string
-    ): void {
+    ): Promise<void> {
         const sortedPoints = [...(questPoints || [])].sort((a, b) => a.orderNum - b.orderNum);
+
+        const passedPoints = await this.participantPointRepository.find({
+            where: {
+                participant: { participantId: participant.participantId }
+            },
+            relations: ['point']
+        });
+
         const passedPointIds = new Set(
-            (participant?.points || []).map(pp => pp.point.questPointId)
+            passedPoints.map(pp => pp.point.questPointId)
         );
 
         if (!passedPointIds.has(pointId)) {
@@ -580,7 +591,7 @@ export class ParticipantTaskService {
             throw new BadRequestException(`Expected task type ${expectedTaskType} but got ${point.task.taskType}`);
         }
 
-        this.validatePointAccess(point, participant, session.quest.points, pointId, 'submitting');
+        await this.validatePointAccess(point, participant, session.quest.points, pointId, 'submitting');
 
         const participantTask = await this.participantTaskRepository.findOne({
             where: {
