@@ -652,7 +652,7 @@ export class QuestSessionService {
             throw new NotFoundException(`Session with ID ${sessionId} not found`);
         }
 
-        if (!session.endReason) {
+        if (!session.endDate) {
             throw new BadRequestException('Session results are only available after the session has ended');
         }
 
