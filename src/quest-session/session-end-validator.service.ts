@@ -107,6 +107,12 @@ export class SessionEndValidatorService {
         this.logger.log(`Checking ${sessions.length} newly started sessions for participants`);
 
         for (const session of sessions) {
+            this.logger.log('Session participants:', session.participants.map(
+                p => ({
+                    participantId: p.participantId,
+                    status: p.participationStatus,
+                }
+            )));
             const nonRejectedParticipants = session.participants.filter(
                 p => p.participationStatus !== ParticipantStatus.REJECTED
             );
