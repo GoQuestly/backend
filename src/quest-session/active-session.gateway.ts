@@ -614,9 +614,12 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
                     passedDate: new Date(),
                 });
 
+                console.log(`[checkAndPassPoint] Created participantPoint - participantId: ${participant.participantId}, pointId: ${nextPoint.questPointId}`);
+
                 try {
                     console.log(`[checkAndPassPoint] Attempting to save point ${nextPoint.questPointId} for participant ${participant.participantId}`);
-                    await this.participantPointRepository.save(participantPoint);
+                    const savedPoint = await this.participantPointRepository.save(participantPoint);
+                    console.log(`[checkAndPassPoint] Saved point result - id: ${savedPoint.participantPointId}, participantId: ${savedPoint.participant?.participantId}, pointId: ${savedPoint.point?.questPointId}`);
                     console.log(`[checkAndPassPoint] Successfully saved point ${nextPoint.questPointId} for participant ${participant.participantId}`);
                 } catch (error) {
                     console.error(`[checkAndPassPoint] Error saving point: code=${error?.code}, constraint=${error?.constraint}, message=${error?.message}`);
@@ -643,8 +646,10 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
 
                 if (participantPassedPoints === totalQuestPoints && !participant.finishDate) {
                     if (!nextPoint.task) {
-                        participant.finishDate = new Date();
-                        await this.participantRepository.save(participant);
+                        await this.participantRepository.update(
+                            { participantId: participant.participantId },
+                            { finishDate: new Date() }
+                        );
 
                         console.log(`[checkAndPassPoint] User ${userId} FINISHED the quest! All ${totalQuestPoints} points passed (no task on last point).`);
                     } else {
