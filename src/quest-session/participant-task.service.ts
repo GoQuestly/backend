@@ -37,6 +37,7 @@ import {TaskCompletionResponseDto} from "@/quest-session/dto/task-completion-res
 import {SubmitCodeWordTaskDto} from "@/quest-session/dto/submit-code-word-task.dto";
 import {QuizAnswerResponseDto} from "@/quest-session/dto/quiz-answer-response.dto";
 import {NotificationService} from '@/notification/notification.service';
+import {SessionEndValidatorService} from './session-end-validator.service';
 
 @Injectable()
 export class ParticipantTaskService {
@@ -60,6 +61,8 @@ export class ParticipantTaskService {
         @Inject(forwardRef(() => ActiveSessionGateway))
         private activeSessionGateway: ActiveSessionGateway,
         private notificationService: NotificationService,
+        @Inject(forwardRef(() => SessionEndValidatorService))
+        private sessionEndValidatorService: SessionEndValidatorService,
     ) {
     }
 
@@ -346,6 +349,8 @@ export class ParticipantTaskService {
                 pointId
             );
 
+            await this.sessionEndValidatorService.checkSessionCompletion(sessionId);
+
             return {
                 success: true,
                 scoreEarned,
@@ -411,6 +416,8 @@ export class ParticipantTaskService {
             participantTask.participant.participantId,
             pointId
         );
+
+        await this.sessionEndValidatorService.checkSessionCompletion(sessionId);
 
         return {
             success: true,
@@ -966,6 +973,8 @@ export class ParticipantTaskService {
             participantTask.participant.participantId,
             task.point.questPointId
         );
+
+        await this.sessionEndValidatorService.checkSessionCompletion(sessionId);
 
         return {
             success: true,

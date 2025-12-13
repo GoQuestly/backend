@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, forwardRef, Inject } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -10,6 +10,7 @@ import { QuestTaskType } from '@/common/enums/quest-task-type';
 import { ParticipantStatus } from '@/common/enums/participant-status';
 import { RejectionReason } from '@/common/enums/rejection-reason';
 import { ActiveSessionGateway } from './active-session.gateway';
+import { SessionEndValidatorService } from './session-end-validator.service';
 
 @Injectable()
 export class TaskExpiryValidatorService {
@@ -25,6 +26,8 @@ export class TaskExpiryValidatorService {
         @InjectRepository(ParticipantTaskQuizAnswerEntity)
         private participantTaskQuizAnswerRepository: Repository<ParticipantTaskQuizAnswerEntity>,
         private activeSessionGateway: ActiveSessionGateway,
+        @Inject(forwardRef(() => SessionEndValidatorService))
+        private sessionEndValidatorService: SessionEndValidatorService,
     ) {}
 
     @Cron(CronExpression.EVERY_30_SECONDS)
@@ -112,6 +115,8 @@ export class TaskExpiryValidatorService {
                     );
                 }
             }
+
+            await this.sessionEndValidatorService.checkSessionCompletion(participant.session.questSessionId);
         } catch (error) {
             this.logger.error(
                 `Failed to handle expired task ${participantTask.participantTaskId}: ${error.message}`,

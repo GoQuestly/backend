@@ -18,6 +18,7 @@ import {ParticipantTaskEntity} from '@/common/entities/participant-task.entity';
 import {RejectionReason} from '@/common/enums/rejection-reason';
 import {calculateDistance, POINT_COMPLETION_RADIUS_METERS, POSTGRES_UNIQUE_VIOLATION_ERROR_CODE} from './participant-task.constants';
 import {isSessionActive} from '@/common/utils/session.util';
+import {SessionEndValidatorService} from './session-end-validator.service';
 
 @WebSocketGateway({
     cors: {
@@ -47,6 +48,8 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
         private participantRepository: Repository<ParticipantEntity>,
         @InjectRepository(ParticipantTaskEntity)
         private participantTaskRepository: Repository<ParticipantTaskEntity>,
+        @Inject(forwardRef(() => SessionEndValidatorService))
+        private sessionEndValidatorService: SessionEndValidatorService,
     ) {
         super();
     }
@@ -639,6 +642,8 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
                         console.log(`[checkAndPassPoint] User ${userId} passed last point with task - finishDate will be set after task completion.`);
                     }
                 }
+
+                await this.sessionEndValidatorService.checkSessionCompletion(sessionId);
 
                 return {
                     pointPassed: true,

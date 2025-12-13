@@ -38,7 +38,6 @@ export class SessionEndValidatorService {
             await this.handleDurationBasedEnding(now, oneMinuteAgo);
 
             await this.handleEmptySessionsAtStart(now, oneMinuteAgo);
-            await this.handleCompletedSessions(now);
 
         } catch (error) {
             this.logger.error(
@@ -136,94 +135,93 @@ export class SessionEndValidatorService {
         }
     }
 
-    private async handleCompletedSessions(now: Date) {
-        const activeSessions = await this.sessionRepository
-            .createQueryBuilder('session')
-            .leftJoinAndSelect('session.quest', 'quest')
-            .leftJoinAndSelect('quest.points', 'questPoints')
-            .leftJoinAndSelect('questPoints.task', 'questTask')
-            .leftJoinAndSelect('session.participants', 'participants')
-            .leftJoinAndSelect('participants.points', 'participantPoints')
-            .leftJoinAndSelect('participants.tasks', 'participantTasks')
-            .leftJoinAndSelect('participantTasks.photo', 'participantTaskPhoto')
-            .where('session.endDate IS NULL')
-            .andWhere('session.startDate <= :now', { now })
-            .getMany();
 
-        if (activeSessions.length === 0) {
-            return;
-        }
+    async checkSessionCompletion(sessionId: number): Promise<void> {
+        const now = new Date();
 
-        this.logger.log(`Checking ${activeSessions.length} active sessions for completion`);
+        try {
+            const session = await this.sessionRepository
+                .createQueryBuilder('session')
+                .leftJoinAndSelect('session.quest', 'quest')
+                .leftJoinAndSelect('quest.points', 'questPoints')
+                .leftJoinAndSelect('questPoints.task', 'questTask')
+                .leftJoinAndSelect('session.participants', 'participants')
+                .leftJoinAndSelect('participants.points', 'participantPoints')
+                .leftJoinAndSelect('participants.tasks', 'participantTasks')
+                .leftJoinAndSelect('participantTasks.photo', 'participantTaskPhoto')
+                .where('session.questSessionId = :sessionId', { sessionId })
+                .andWhere('session.endDate IS NULL')
+                .getOne();
 
-        for (const session of activeSessions) {
-            try {
-                const questDurationMs = session.quest.maxDurationMinutes * 60 * 1000;
-                const maxEndTime = new Date(session.startDate.getTime() + questDurationMs);
-
-                if (now >= maxEndTime) {
-                    continue;
-                }
-
-                const totalQuestPoints = session.quest.points.length;
-                const totalQuestTasks = session.quest.points.filter(p => p.task !== null).length;
-                const approvedParticipants = session.participants.filter(
-                    p => p.participationStatus === ParticipantStatus.APPROVED || p.participationStatus === ParticipantStatus.PENDING
-                );
-
-                if (approvedParticipants.length === 0) {
-                    this.logger.log(
-                        `Session ${session.questSessionId} has no approved participants - ending`
-                    );
-
-                    session.endReason = QuestSessionEndReason.FINISHED;
-                    session.endDate = now;
-                    await this.sessionRepository.save(session);
-
-                    await this.locationService.rejectParticipantsWithoutLocation(
-                        session.questSessionId
-                    );
-
-                    await this.sendSessionEndNotifications(session.questSessionId);
-
-                    continue;
-                }
-
-                const allFinished = approvedParticipants.every(p => {
-                    const passedPointsCount = p.points?.length || 0;
-                    const completedTasksCount = p.tasks?.filter(t => t.completedDate !== null).length || 0;
-                    const hasUnmoderatedPhotos = p.tasks?.some(t =>
-                        t.completedDate !== null &&
-                        t.photo &&
-                        t.photo.isApproved === null
-                    ) || false;
-                    return passedPointsCount === totalQuestPoints &&
-                           completedTasksCount === totalQuestTasks &&
-                           !hasUnmoderatedPhotos;
-                });
-
-                if (allFinished) {
-                    this.logger.log(
-                        `Session ${session.questSessionId} - all ${approvedParticipants.length} approved participants finished - ending`
-                    );
-
-                    session.endReason = QuestSessionEndReason.FINISHED;
-                    session.endDate = now;
-                    await this.sessionRepository.save(session);
-
-                    await this.locationService.rejectParticipantsWithoutLocation(
-                        session.questSessionId
-                    );
-
-                    await this.sendSessionEndNotifications(session.questSessionId);
-                }
-
-            } catch (error) {
-                this.logger.error(
-                    `Failed to check completion for session ${session.questSessionId}: ${error.message}`,
-                    error.stack
-                );
+            if (!session) {
+                return;
             }
+
+            const questDurationMs = session.quest.maxDurationMinutes * 60 * 1000;
+            const maxEndTime = new Date(session.startDate.getTime() + questDurationMs);
+
+            if (now >= maxEndTime) {
+                return;
+            }
+
+            const totalQuestPoints = session.quest.points.length;
+            const totalQuestTasks = session.quest.points.filter(p => p.task !== null).length;
+            const approvedParticipants = session.participants.filter(
+                p => p.participationStatus === ParticipantStatus.APPROVED || p.participationStatus === ParticipantStatus.PENDING
+            );
+
+            if (approvedParticipants.length === 0) {
+                this.logger.log(
+                    `Session ${session.questSessionId} has no approved participants - ending`
+                );
+
+                session.endReason = QuestSessionEndReason.FINISHED;
+                session.endDate = now;
+                await this.sessionRepository.save(session);
+
+                await this.locationService.rejectParticipantsWithoutLocation(
+                    session.questSessionId
+                );
+
+                await this.sendSessionEndNotifications(session.questSessionId);
+
+                return;
+            }
+
+            const allFinished = approvedParticipants.every(p => {
+                const passedPointsCount = p.points?.length || 0;
+                const completedTasksCount = p.tasks?.filter(t => t.completedDate !== null).length || 0;
+                const hasUnmoderatedPhotos = p.tasks?.some(t =>
+                    t.completedDate !== null &&
+                    t.photo &&
+                    t.photo.isApproved === null
+                ) || false;
+                return passedPointsCount === totalQuestPoints &&
+                       completedTasksCount === totalQuestTasks &&
+                       !hasUnmoderatedPhotos;
+            });
+
+            if (allFinished) {
+                this.logger.log(
+                    `Session ${session.questSessionId} - all ${approvedParticipants.length} approved participants finished - ending immediately`
+                );
+
+                session.endReason = QuestSessionEndReason.FINISHED;
+                session.endDate = now;
+                await this.sessionRepository.save(session);
+
+                await this.locationService.rejectParticipantsWithoutLocation(
+                    session.questSessionId
+                );
+
+                await this.sendSessionEndNotifications(session.questSessionId);
+            }
+
+        } catch (error) {
+            this.logger.error(
+                `Failed to check completion for session ${sessionId}: ${error.message}`,
+                error.stack
+            );
         }
     }
 
