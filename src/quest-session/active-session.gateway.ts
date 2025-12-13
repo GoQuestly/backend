@@ -591,8 +591,6 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
             console.log(`[checkAndPassPoint] User ${userId} distance to point ${nextPoint.questPointId}: ${distance}m (threshold: ${POINT_COMPLETION_RADIUS_METERS}m)`);
 
             if (distance <= POINT_COMPLETION_RADIUS_METERS) {
-                console.log(`[ ] Checking if point ${nextPoint.questPointId} already passed by participant ${participant.participantId}`);
-
                 const alreadyPassed = await this.participantPointRepository.findOne({
                     where: {
                         participant: {participantId: participant.participantId},
@@ -601,12 +599,9 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
                 });
 
                 if (alreadyPassed) {
-                    console.log(`[checkAndPassPoint] Point ${nextPoint.questPointId} already passed by user ${userId} (found in DB)`);
+                    console.log(`[checkAndPassPoint] Point ${nextPoint.questPointId} already passed by user ${userId}`);
                     return null;
                 }
-
-                console.log(`[checkAndPassPoint] Point ${nextPoint.questPointId} not yet passed by participant ${participant.participantId}, proceeding to save`);
-
 
                 const participantPoint = this.participantPointRepository.create({
                     participant,
@@ -614,16 +609,9 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
                     passedDate: new Date(),
                 });
 
-                console.log(`[checkAndPassPoint] Created participantPoint - participantId: ${participant.participantId}, pointId: ${nextPoint.questPointId}`);
-
                 try {
-                    console.log(`[checkAndPassPoint] Attempting to save point ${nextPoint.questPointId} for participant ${participant.participantId}`);
-                    const savedPoint = await this.participantPointRepository.save(participantPoint);
-                    console.log(`[checkAndPassPoint] Saved point result - id: ${savedPoint.participantPointId}, participantId: ${savedPoint.participant?.participantId}, pointId: ${savedPoint.point?.questPointId}`);
-                    console.log(`[checkAndPassPoint] Successfully saved point ${nextPoint.questPointId} for participant ${participant.participantId}`);
+                    await this.participantPointRepository.save(participantPoint);
                 } catch (error) {
-                    console.error(`[checkAndPassPoint] Error saving point: code=${error?.code}, constraint=${error?.constraint}, message=${error?.message}`);
-
                     const isDuplicateError =
                         error?.code === POSTGRES_UNIQUE_VIOLATION_ERROR_CODE ||
                         error?.constraint?.includes('participant') ||
@@ -631,7 +619,7 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
                         error?.message?.toLowerCase().includes('unique');
 
                     if (isDuplicateError) {
-                        console.log(`[checkAndPassPoint] Point ${nextPoint.questPointId} already passed by user ${userId} (caught race condition - duplicate key error)`);
+                        console.log(`[checkAndPassPoint] Point ${nextPoint.questPointId} already passed by user ${userId} (caught race condition)`);
                         return null;
                     }
 

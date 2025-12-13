@@ -812,6 +812,7 @@ export class QuestSessionService {
             questTitle: session.quest.title,
             startDate: session.startDate,
             endDate: session.endDate,
+            endReason: session.endReason,
             isActive: isSessionActive(session),
             participantCount: session.participants?.length || 0,
             questPointCount,

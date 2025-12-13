@@ -1,4 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
+import { QuestSessionEndReason } from "@/common/enums/quest-session-end-reason";
 
 export class QuestSessionListResponseDto {
     @ApiProperty({
@@ -27,6 +28,13 @@ export class QuestSessionListResponseDto {
         nullable: true
     })
     endDate: Date;
+
+    @ApiProperty({
+        enum: QuestSessionEndReason,
+        required: false,
+        example: null
+    })
+    endReason?: QuestSessionEndReason;
 
     @ApiProperty({
         example: true
