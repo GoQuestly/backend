@@ -591,6 +591,8 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
             console.log(`[checkAndPassPoint] User ${userId} distance to point ${nextPoint.questPointId}: ${distance}m (threshold: ${POINT_COMPLETION_RADIUS_METERS}m)`);
 
             if (distance <= POINT_COMPLETION_RADIUS_METERS) {
+                console.log(`[ ] Checking if point ${nextPoint.questPointId} already passed by participant ${participant.participantId}`);
+
                 const alreadyPassed = await this.participantPointRepository.findOne({
                     where: {
                         participant: {participantId: participant.participantId},
@@ -599,9 +601,12 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
                 });
 
                 if (alreadyPassed) {
-                    console.log(`[checkAndPassPoint] Point ${nextPoint.questPointId} already passed by user ${userId}`);
+                    console.log(`[checkAndPassPoint] Point ${nextPoint.questPointId} already passed by user ${userId} (found in DB)`);
                     return null;
                 }
+
+                console.log(`[checkAndPassPoint] Point ${nextPoint.questPointId} not yet passed by participant ${participant.participantId}, proceeding to save`);
+
 
                 const participantPoint = this.participantPointRepository.create({
                     participant,
@@ -610,8 +615,12 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
                 });
 
                 try {
+                    console.log(`[checkAndPassPoint] Attempting to save point ${nextPoint.questPointId} for participant ${participant.participantId}`);
                     await this.participantPointRepository.save(participantPoint);
+                    console.log(`[checkAndPassPoint] Successfully saved point ${nextPoint.questPointId} for participant ${participant.participantId}`);
                 } catch (error) {
+                    console.error(`[checkAndPassPoint] Error saving point: code=${error?.code}, constraint=${error?.constraint}, message=${error?.message}`);
+
                     const isDuplicateError =
                         error?.code === POSTGRES_UNIQUE_VIOLATION_ERROR_CODE ||
                         error?.constraint?.includes('participant') ||
@@ -619,7 +628,7 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
                         error?.message?.toLowerCase().includes('unique');
 
                     if (isDuplicateError) {
-                        console.log(`[checkAndPassPoint] Point ${nextPoint.questPointId} already passed by user ${userId} (caught race condition)`);
+                        console.log(`[checkAndPassPoint] Point ${nextPoint.questPointId} already passed by user ${userId} (caught race condition - duplicate key error)`);
                         return null;
                     }
 
