@@ -19,6 +19,10 @@ export class AdminJwtStrategy extends PassportStrategy(Strategy, 'admin-jwt') {
     }
 
     async validate(payload: any) {
+        if (payload.role && payload.role !== 'admin') {
+            throw new UnauthorizedException('Invalid token type for admin endpoint');
+        }
+
         const adminId = payload.sub;
 
         const admin = await this.adminRepo.findOne({

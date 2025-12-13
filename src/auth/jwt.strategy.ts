@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -20,12 +20,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     async validate(payload: any) {
+        if (payload.role && payload.role !== 'user') {
+            throw new UnauthorizedException('Invalid token type for this endpoint');
+        }
+
         const user = await this.userRepo.findOne({
             where: { userId: payload.sub },
             select: ['userId', 'email', 'isBanned']
         });
 
-        if (user && user.isBanned) {
+        if (!user) {
+            throw new UnauthorizedException('User not found');
+        }
+
+        if (user.isBanned) {
             throw new UserBannedException();
         }
 
