@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -8,6 +8,8 @@ import { LocationService } from './location.service';
 import { NotificationService } from '@/notification/notification.service';
 import { ParticipantStatus } from '@/common/enums/participant-status';
 import { QuestSessionEndReason } from '@/common/enums/quest-session-end-reason';
+import { SessionEventsGateway } from './session-events.gateway';
+import { ActiveSessionGateway } from './active-session.gateway';
 
 @Injectable()
 export class SessionEndValidatorService {
@@ -20,6 +22,10 @@ export class SessionEndValidatorService {
         private participantRepository: Repository<ParticipantEntity>,
         private locationService: LocationService,
         private notificationService: NotificationService,
+        @Inject(forwardRef(() => SessionEventsGateway))
+        private sessionEventsGateway: SessionEventsGateway,
+        @Inject(forwardRef(() => ActiveSessionGateway))
+        private activeSessionGateway: ActiveSessionGateway,
     ) {
     }
 
@@ -286,6 +292,15 @@ export class SessionEndValidatorService {
 
             this.logger.log(
                 `Sent session end notifications to ${approvedParticipants.length} participants for session ${sessionId}`
+            );
+
+            await Promise.all([
+                this.activeSessionGateway.notifySessionEnded(sessionId),
+                this.sessionEventsGateway.notifySessionEnded(sessionId),
+            ]);
+
+            this.logger.log(
+                `Sent session end websocket events for session ${sessionId}`
             );
         } catch (error) {
             this.logger.error(

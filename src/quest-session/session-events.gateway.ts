@@ -256,4 +256,24 @@ export class SessionEventsGateway extends AbstractSessionGateway {
             console.error('[session-events:notify] Error broadcasting session cancellation:', error.message);
         }
     }
+
+    async notifySessionEnded(sessionId: number): Promise<void> {
+        try {
+            if (!sessionId || sessionId <= 0) {
+                return;
+            }
+
+            const endEvent = {
+                sessionId,
+                endedAt: new Date(),
+                message: 'Session has ended',
+            };
+
+            this.server.to(`session-${sessionId}`).emit('session-ended', endEvent);
+
+            console.log(`[session-events:notify] Session ${sessionId} end broadcasted`);
+        } catch (error) {
+            console.error('[session-events:notify] Error broadcasting session end:', error.message);
+        }
+    }
 }

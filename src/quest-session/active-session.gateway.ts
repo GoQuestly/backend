@@ -462,6 +462,26 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
         }
     }
 
+    async notifySessionEnded(sessionId: number): Promise<void> {
+        try {
+            if (!sessionId || sessionId <= 0) {
+                return;
+            }
+
+            const endEvent = {
+                sessionId,
+                endedAt: new Date(),
+                message: 'Session has ended',
+            };
+
+            this.server.to(`session-${sessionId}`).emit('session-ended', endEvent);
+
+            console.log(`[active-session:notify] Session ${sessionId} end broadcasted`);
+        } catch (error) {
+            console.error('[active-session:notify] Error broadcasting session end:', error.message);
+        }
+    }
+
     private async checkAndPassPoint(
         sessionId: number,
         userId: number,
