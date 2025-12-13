@@ -27,6 +27,11 @@ export const NOTIFICATION_MESSAGES = {
         body: (questTitle: string, rank: number, totalScore: number) =>
             `Quest "${questTitle}" completed!\nYour rank: ${rank}\nScore: ${totalScore}`,
     },
+    SESSION_ENDED_NOT_FINISHED: {
+        title: 'Quest Ended',
+        body: (questTitle: string, rank: number, totalScore: number) =>
+            `Quest "${questTitle}" has ended.\nYour rank: ${rank}\nScore: ${totalScore}`,
+    },
     PARTICIPANT_REJECTED: {
         title: 'Participation Rejected',
         body: (questTitle: string) =>

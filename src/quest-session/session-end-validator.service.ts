@@ -279,8 +279,8 @@ export class SessionEndValidatorService {
                     sessionId,
                     session.quest.title,
                     finished,
-                    finished ? rank : undefined,
-                    finished ? totalScore : undefined
+                    rank,
+                    totalScore
                 );
             }
 

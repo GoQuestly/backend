@@ -94,9 +94,14 @@ export class NotificationService {
         let title: string;
         let body: string;
 
-        if (finished && rank !== undefined && totalScore !== undefined) {
-            title = NOTIFICATION_MESSAGES.SESSION_ENDED_WITH_RESULTS.title;
-            body = NOTIFICATION_MESSAGES.SESSION_ENDED_WITH_RESULTS.body(questTitle, rank, totalScore);
+        if (rank !== undefined && totalScore !== undefined) {
+            if (finished) {
+                title = NOTIFICATION_MESSAGES.SESSION_ENDED_WITH_RESULTS.title;
+                body = NOTIFICATION_MESSAGES.SESSION_ENDED_WITH_RESULTS.body(questTitle, rank, totalScore);
+            } else {
+                title = NOTIFICATION_MESSAGES.SESSION_ENDED_NOT_FINISHED.title;
+                body = NOTIFICATION_MESSAGES.SESSION_ENDED_NOT_FINISHED.body(questTitle, rank, totalScore);
+            }
         } else {
             title = NOTIFICATION_MESSAGES.SESSION_ENDED.title;
             body = NOTIFICATION_MESSAGES.SESSION_ENDED.body(questTitle);
