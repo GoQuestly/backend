@@ -10,7 +10,7 @@ export class ParticipantTaskQuizAnswerEntity {
     @ManyToOne(() => ParticipantTaskEntity, (pt) => pt.quizAnswers)
     participantTask: ParticipantTaskEntity;
 
-    @ManyToOne(() => QuizAnswerEntity)
+    @ManyToOne(() => QuizAnswerEntity, { onDelete: 'CASCADE' })
     answer: QuizAnswerEntity;
 
     @Column({name: "answer_date" })
