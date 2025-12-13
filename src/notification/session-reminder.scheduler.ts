@@ -4,12 +4,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, IsNull } from 'typeorm';
 import { QuestSessionEntity } from '@/common/entities/quest-session.entity';
 import { ParticipantEntity } from '@/common/entities/participant.entity';
-import { ParticipantStatus } from '@/common/enums/participant-status';
 import { NotificationService } from './notification.service';
 
 const EARLY_REMINDER_MINUTES = 10;
 const EARLY_REMINDER_MS = EARLY_REMINDER_MINUTES * 60 * 1000;
-const START_REMINDER_BUFFER_SECONDS = 30;
+const START_REMINDER_BUFFER_SECONDS = 60;
 const START_REMINDER_BUFFER_MS = START_REMINDER_BUFFER_SECONDS * 1000;
 
 @Injectable()
@@ -25,7 +24,7 @@ export class SessionReminderScheduler {
         private notificationService: NotificationService,
     ) {}
 
-    @Cron(CronExpression.EVERY_10_SECONDS)
+    @Cron(CronExpression.EVERY_MINUTE)
     async checkSessionReminders() {
         const now = new Date();
         const earlyReminderTime = new Date(now.getTime() + EARLY_REMINDER_MS);
@@ -34,7 +33,7 @@ export class SessionReminderScheduler {
         try {
             await this.handleEarlyReminders(now, earlyReminderTime);
 
-            await this.handleStartReminders(now, startReminderBufferTime);
+            await this.handleStartReminders(now);
         } catch (error) {
             this.logger.error(
                 `Error in checkSessionReminders: ${error.message}`,
@@ -93,10 +92,11 @@ export class SessionReminderScheduler {
         }
     }
 
-    private async handleStartReminders(now: Date, startReminderBufferTime: Date) {
+    private async handleStartReminders(now: Date) {
+        const startReminderWindowStart = new Date(now.getTime() - START_REMINDER_BUFFER_MS);
         const startingSessions = await this.sessionRepository.find({
             where: {
-                startDate: Between(now, startReminderBufferTime),
+                startDate: Between(startReminderWindowStart, now),
                 endReason: IsNull(),
             },
             relations: ['quest', 'participants', 'participants.user'],
