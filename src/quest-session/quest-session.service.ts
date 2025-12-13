@@ -665,7 +665,7 @@ export class QuestSessionService {
         }
 
         const sessionDurationSeconds = session.endDate
-            ? Math.floor((session.endDate.getTime() - session.startDate.getTime()) / 1000)
+            ? Math.max(0, Math.floor((session.endDate.getTime() - session.startDate.getTime()) / 1000))
             : 0;
 
         const finishedParticipants = session.participants.filter(
