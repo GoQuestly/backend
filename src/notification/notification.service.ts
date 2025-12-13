@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { FcmService } from './fcm.service';
 import { UserEntity } from '@/common/entities/user.entity';
 import { ParticipantEntity } from '@/common/entities/participant.entity';
@@ -18,17 +18,21 @@ export class NotificationService {
         private userRepository: Repository<UserEntity>,
     ) {}
 
+    private async getDeviceTokensFromParticipants(participants: ParticipantEntity[]): Promise<string[]> {
+        const userIds = participants.map(p => p.user.userId);
+        const users = await this.userRepository.findBy({ userId: In(userIds) });
+
+        return users
+            .map(u => u.deviceToken)
+            .filter((token): token is string => !!token);
+    }
+
     async sendSessionStartReminderEarlyToMultiple(
         participants: ParticipantEntity[],
         sessionId: number,
         questTitle: string
     ): Promise<number> {
-        const userIds = participants.map(p => p.user.userId);
-        const users = await this.userRepository.findBy({ userId: userIds as any });
-
-        const deviceTokens = users
-            .map(u => u.deviceToken)
-            .filter((token): token is string => !!token);
+        const deviceTokens = await this.getDeviceTokensFromParticipants(participants);
 
         if (deviceTokens.length === 0) {
             return 0;
@@ -52,12 +56,7 @@ export class NotificationService {
         sessionId: number,
         questTitle: string
     ): Promise<number> {
-        const userIds = participants.map(p => p.user.userId);
-        const users = await this.userRepository.findBy({ userId: userIds as any });
-
-        const deviceTokens = users
-            .map(u => u.deviceToken)
-            .filter((token): token is string => !!token);
+        const deviceTokens = await this.getDeviceTokensFromParticipants(participants);
 
         if (deviceTokens.length === 0) {
             return 0;
@@ -147,12 +146,7 @@ export class NotificationService {
         sessionId: number,
         questTitle: string
     ): Promise<number> {
-        const userIds = participants.map(p => p.user.userId);
-        const users = await this.userRepository.findBy({ userId: userIds as any });
-
-        const deviceTokens = users
-            .map(u => u.deviceToken)
-            .filter((token): token is string => !!token);
+        const deviceTokens = await this.getDeviceTokensFromParticipants(participants);
 
         if (deviceTokens.length === 0) {
             return 0;
