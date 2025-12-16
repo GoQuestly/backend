@@ -7,7 +7,7 @@ import {
     NotFoundException
 } from '@nestjs/common';
 import {InjectRepository} from '@nestjs/typeorm';
-import {Repository, Not, IsNull} from 'typeorm';
+import {Repository, Not, IsNull, DataSource} from 'typeorm';
 import {QuestSessionEntity} from '@/common/entities/quest-session.entity';
 import {QuestPointEntity} from '@/common/entities/quest-point.entity';
 import {QuestTaskEntity} from '@/common/entities/quest-task.entity';
@@ -63,6 +63,7 @@ export class ParticipantTaskService {
         private notificationService: NotificationService,
         @Inject(forwardRef(() => SessionEndValidatorService))
         private sessionEndValidatorService: SessionEndValidatorService,
+        private dataSource: DataSource,
     ) {
     }
 
@@ -339,8 +340,7 @@ export class ParticipantTaskService {
             await this.checkAndDisqualifyIfRequired(
                 sessionId,
                 participantTask.participant.participantId,
-                task,
-                passed
+                task.questTaskId
             );
 
             await this.checkAndSetFinishDateIfComplete(
@@ -407,8 +407,7 @@ export class ParticipantTaskService {
         await this.checkAndDisqualifyIfRequired(
             sessionId,
             participantTask.participant.participantId,
-            task,
-            isCorrect
+            task.questTaskId
         );
 
         await this.checkAndSetFinishDateIfComplete(
@@ -676,16 +675,45 @@ export class ParticipantTaskService {
     private async checkAndDisqualifyIfRequired(
         sessionId: number,
         participantId: number,
-        task: QuestTaskEntity,
-        passed: boolean
+        taskId: number,
+        transactionalEntityManager?: any
     ): Promise<void> {
         try {
-            if (!task.isRequiredForNextPoint) {
+            const em = transactionalEntityManager || this.dataSource.manager;
+
+            const task = await em.findOne(QuestTaskEntity, {
+                where: { questTaskId: taskId },
+            });
+
+            if (!task || !task.isRequiredForNextPoint) {
                 return;
             }
 
+            const participantTask = await em.findOne(ParticipantTaskEntity, {
+                where: {
+                    participant: { participantId },
+                    task: { questTaskId: taskId },
+                },
+                relations: ['photo'],
+            });
+
+            if (!participantTask || !participantTask.completedDate) {
+                return;
+            }
+
+            let passed = false;
+
+            if (task.taskType === QuestTaskType.PHOTO) {
+                passed = participantTask.photo?.isApproved === true;
+            } else if (task.taskType === QuestTaskType.CODE_WORD) {
+                passed = participantTask.scoreEarned > 0;
+            } else if (task.taskType === QuestTaskType.QUIZ) {
+                const scorePercent = (participantTask.scoreEarned / task.maxScorePointsCount) * 100;
+                passed = scorePercent >= task.successScorePointsPercent;
+            }
+
             if (!passed) {
-                const session = await this.sessionRepository.findOne({
+                const session = await em.findOne(QuestSessionEntity, {
                     where: { questSessionId: sessionId },
                     relations: ['quest', 'quest.organizer'],
                 });
@@ -694,7 +722,7 @@ export class ParticipantTaskService {
                     return;
                 }
 
-                const participant = await this.participantRepository.findOne({
+                const participant = await em.findOne(ParticipantEntity, {
                     where: { participantId },
                     relations: ['user'],
                 });
@@ -705,7 +733,7 @@ export class ParticipantTaskService {
 
                 participant.participationStatus = ParticipantStatus.DISQUALIFIED;
                 participant.rejectionReason = RejectionReason.REQUIRED_TASK_NOT_COMPLETED;
-                await this.participantRepository.save(participant);
+                await em.save(ParticipantEntity, participant);
 
                 await this.activeSessionGateway.notifyParticipantDisqualified(sessionId, session.quest.organizer.userId, participant);
 
@@ -719,10 +747,13 @@ export class ParticipantTaskService {
     private async checkAndSetFinishDateIfComplete(
         sessionId: number,
         participantId: number,
-        pointId: number
+        pointId: number,
+        transactionalEntityManager?: any
     ): Promise<void> {
         try {
-            const session = await this.sessionRepository.findOne({
+            const em = transactionalEntityManager || this.dataSource.manager;
+
+            const session = await em.findOne(QuestSessionEntity, {
                 where: { questSessionId: sessionId },
                 relations: ['quest', 'quest.points', 'quest.points.task'],
             });
@@ -731,7 +762,7 @@ export class ParticipantTaskService {
                 return;
             }
 
-            const participant = await this.participantRepository.findOne({
+            const participant = await em.findOne(ParticipantEntity, {
                 where: { participantId },
                 relations: ['points', 'tasks', 'tasks.photo'],
             });
@@ -762,7 +793,7 @@ export class ParticipantTaskService {
                     completedTasksCount === totalQuestTasks &&
                     !hasUnmoderatedPhotos) {
                     participant.finishDate = new Date();
-                    await this.participantRepository.save(participant);
+                    await em.save(ParticipantEntity, participant);
 
                     console.log(`[ParticipantTaskService] User ${participantId} FINISHED the quest: passed ${passedPointsCount}/${totalQuestPoints} points, completed ${completedTasksCount}/${totalQuestTasks} tasks, all photos moderated.`);
                 }
@@ -875,36 +906,61 @@ export class ParticipantTaskService {
         const participantTask = photo.participantTask;
         const task = participantTask.task;
         const scoreAdjustment = dto.approved ? task.maxScorePointsCount : 0;
+        const participantId = participantTask.participant.participantId;
+        const taskId = task.questTaskId;
+        const pointId = task.point.questPointId;
+        const userId = participantTask.participant.user.userId;
+        const userName = participantTask.participant.user.name;
 
-        await this.participantTaskRepository.update(
-            { participantTaskId: participantTask.participantTaskId },
-            { scoreEarned: scoreAdjustment }
-        );
+        let totalScore: number;
 
-        await this.participantTaskPhotoRepository.update(
-            { participantTaskPhotoId: photoId },
-            { isApproved: dto.approved }
-        );
+        await this.dataSource.transaction(async (transactionalEntityManager) => {
+            await transactionalEntityManager.update(
+                ParticipantTaskEntity,
+                { participantTaskId: participantTask.participantTaskId },
+                { scoreEarned: scoreAdjustment }
+            );
 
-        const participant = await this.participantRepository.findOne({
-            where: { participantId: participantTask.participant.participantId },
-            relations: ['tasks'],
+            await transactionalEntityManager.update(
+                ParticipantTaskPhotoEntity,
+                { participantTaskPhotoId: photoId },
+                { isApproved: dto.approved }
+            );
+
+            const participant = await transactionalEntityManager.findOne(ParticipantEntity, {
+                where: { participantId },
+                relations: ['tasks'],
+            });
+
+            totalScore = participant.tasks
+                ?.filter(t => t.completedDate !== null)
+                .reduce((sum, t) => sum + (t.scoreEarned || 0), 0) || 0;
+
+            await this.checkAndDisqualifyIfRequired(
+                sessionId,
+                participantId,
+                taskId,
+                transactionalEntityManager
+            );
+
+            await this.checkAndSetFinishDateIfComplete(
+                sessionId,
+                participantId,
+                pointId,
+                transactionalEntityManager
+            );
         });
-
-        const totalScore = participant.tasks
-            ?.filter(t => t.completedDate !== null)
-            .reduce((sum, t) => sum + (t.scoreEarned || 0), 0) || 0;
 
         await this.activeSessionGateway.notifyPhotoModerated(
             sessionId,
             organizerUserId,
-            participantTask.participant.user.userId,
+            userId,
             {
                 participantTaskPhotoId: photo.participantTaskPhotoId,
                 participantTaskId: participantTask.participantTaskId,
-                userId: participantTask.participant.user.userId,
-                userName: participantTask.participant.user.name,
-                questTaskId: task.questTaskId,
+                userId,
+                userName,
+                questTaskId: taskId,
                 taskDescription: task.description,
                 pointName: task.point.name,
                 photoUrl: photo.photoUrl,
@@ -916,7 +972,7 @@ export class ParticipantTaskService {
         );
 
         await this.notificationService.sendPhotoModerationNotification(
-            participantTask.participant.user.userId,
+            userId,
             sessionId,
             session.quest.title,
             task.description,
@@ -945,19 +1001,6 @@ export class ParticipantTaskService {
             .sort((a, b) => b.totalScore - a.totalScore);
 
         await this.activeSessionGateway.notifyScoresUpdated(sessionId, participantScores);
-
-        await this.checkAndDisqualifyIfRequired(
-            sessionId,
-            participantTask.participant.participantId,
-            task,
-            dto.approved
-        );
-
-        await this.checkAndSetFinishDateIfComplete(
-            sessionId,
-            participantTask.participant.participantId,
-            task.point.questPointId
-        );
 
         await this.sessionEndValidatorService.checkSessionCompletion(sessionId);
 
