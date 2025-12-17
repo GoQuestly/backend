@@ -15,7 +15,7 @@ export class ParticipantTaskPhotoEntity {
     @Column({ name: "is_approved", nullable: true })
     isApproved: boolean | null;
 
-    @OneToOne(() => ParticipantTaskEntity, (pt) => pt.photo)
+    @OneToOne(() => ParticipantTaskEntity, (pt) => pt.photo, { onDelete: 'CASCADE' })
     @JoinColumn({ name: "participant_task_id" })
     participantTask: ParticipantTaskEntity;
 }

@@ -20,13 +20,13 @@ export class ParticipantEntity {
     @JoinColumn({ name: 'session_quest_session_id' })
     session: QuestSessionEntity;
 
-    @OneToMany(() => ParticipantLocationEntity, (loc) => loc.participant)
+    @OneToMany(() => ParticipantLocationEntity, (loc) => loc.participant, { cascade: true })
     locations: ParticipantLocationEntity[];
 
-    @OneToMany(() => ParticipantTaskEntity, (pt) => pt.participant)
+    @OneToMany(() => ParticipantTaskEntity, (pt) => pt.participant, { cascade: true })
     tasks: ParticipantTaskEntity[];
 
-    @OneToMany(() => ParticipantPointEntity, (pp) => pp.participant)
+    @OneToMany(() => ParticipantPointEntity, (pp) => pp.participant, { cascade: true })
     points: ParticipantPointEntity[];
 
     @CreateDateColumn({ name: 'created_at' })

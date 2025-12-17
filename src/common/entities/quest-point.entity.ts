@@ -20,7 +20,7 @@ export class QuestPointEntity {
     @Column({ name: "order_num" })
     orderNum: number;
 
-    @ManyToOne(() => QuestEntity, (quest) => quest.points)
+    @ManyToOne(() => QuestEntity, (quest) => quest.points, { onDelete: 'CASCADE' })
     quest: QuestEntity;
 
     @Column({ name: "quest_task_id", unique: true, nullable: true })
@@ -33,6 +33,6 @@ export class QuestPointEntity {
     @JoinColumn({ name: "quest_task_id" })
     task: QuestTaskEntity;
 
-    @OneToMany(() => ParticipantPointEntity, (pp) => pp.point)
+    @OneToMany(() => ParticipantPointEntity, (pp) => pp.point, { cascade: true })
     participantPoints: ParticipantPointEntity[];
 }

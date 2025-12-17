@@ -7,7 +7,7 @@ export class ParticipantTaskQuizAnswerEntity {
     @PrimaryGeneratedColumn({ name: "participant_task_quiz_answer_id" })
     participantTaskQuizAnswerId : number;
 
-    @ManyToOne(() => ParticipantTaskEntity, (pt) => pt.quizAnswers)
+    @ManyToOne(() => ParticipantTaskEntity, (pt) => pt.quizAnswers, { onDelete: 'CASCADE' })
     participantTask: ParticipantTaskEntity;
 
     @ManyToOne(() => QuizAnswerEntity, { onDelete: 'CASCADE' })

@@ -15,6 +15,6 @@ export class ParticipantLocationEntity {
     @Column()
     timestamp: Date;
 
-    @ManyToOne(() => ParticipantEntity, (p) => p.locations)
+    @ManyToOne(() => ParticipantEntity, (p) => p.locations, { onDelete: 'CASCADE' })
     participant: ParticipantEntity;
 }

@@ -19,6 +19,6 @@ export class QuizQuestionEntity {
     @ManyToOne(() => QuestTaskEntity, (task) => task.quizQuestions, { onDelete: 'CASCADE' })
     task: QuestTaskEntity;
 
-    @OneToMany(() => QuizAnswerEntity, (a) => a.question)
+    @OneToMany(() => QuizAnswerEntity, (a) => a.question, { cascade: true })
     answers: QuizAnswerEntity[];
 }

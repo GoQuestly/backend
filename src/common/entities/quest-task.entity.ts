@@ -33,9 +33,9 @@ export class QuestTaskEntity {
     @OneToOne(() => QuestPointEntity, (p) => p.task)
     point: QuestPointEntity;
 
-    @OneToMany(() => QuizQuestionEntity, (q) => q.task)
+    @OneToMany(() => QuizQuestionEntity, (q) => q.task, { cascade: true })
     quizQuestions: QuizQuestionEntity[];
 
-    @OneToMany(() => ParticipantTaskEntity, (pt) => pt.task)
+    @OneToMany(() => ParticipantTaskEntity, (pt) => pt.task, { cascade: true })
     participantTasks: ParticipantTaskEntity[];
 }

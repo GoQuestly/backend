@@ -9,16 +9,16 @@ export class ParticipantTaskEntity {
     @PrimaryGeneratedColumn({ name: "participant_task_id"})
     participantTaskId: number;
 
-    @ManyToOne(() => ParticipantEntity, (p) => p.tasks)
+    @ManyToOne(() => ParticipantEntity, (p) => p.tasks, { onDelete: 'CASCADE' })
     participant: ParticipantEntity;
 
-    @ManyToOne(() => QuestTaskEntity, (t) => t.participantTasks)
+    @ManyToOne(() => QuestTaskEntity, (t) => t.participantTasks, { onDelete: 'CASCADE' })
     task: QuestTaskEntity;
 
-    @OneToOne(() => ParticipantTaskPhotoEntity, (photo) => photo.participantTask)
+    @OneToOne(() => ParticipantTaskPhotoEntity, (photo) => photo.participantTask, { cascade: true })
     photo: ParticipantTaskPhotoEntity;
 
-    @OneToMany(() => ParticipantTaskQuizAnswerEntity, (a) => a.participantTask)
+    @OneToMany(() => ParticipantTaskQuizAnswerEntity, (a) => a.participantTask, { cascade: true })
     quizAnswers: ParticipantTaskQuizAnswerEntity[];
 
     @Column({ name: "start_date", nullable: true })

@@ -52,7 +52,7 @@ export class QuestEntity {
     @ManyToOne(() => UserEntity, (user) => user.quests)
     organizer: UserEntity;
 
-    @OneToMany(() => QuestPointEntity, (p) => p.quest)
+    @OneToMany(() => QuestPointEntity, (p) => p.quest, { cascade: true })
     points: QuestPointEntity[];
 
     @OneToMany(() => QuestSessionEntity, (s) => s.quest)
