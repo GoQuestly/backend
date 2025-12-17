@@ -16,6 +16,7 @@ import {ParticipantPointEntity} from '@/common/entities/participant-point.entity
 import {ParticipantEntity} from '@/common/entities/participant.entity';
 import {ParticipantTaskEntity} from '@/common/entities/participant-task.entity';
 import {RejectionReason} from '@/common/enums/rejection-reason';
+import {QuestTaskType} from '@/common/enums/quest-task-type';
 import {calculateDistance, POINT_COMPLETION_RADIUS_METERS, POSTGRES_UNIQUE_VIOLATION_ERROR_CODE} from './participant-task.constants';
 import {isSessionActive} from '@/common/utils/session.util';
 import {SessionEndValidatorService} from './session-end-validator.service';
@@ -569,17 +570,39 @@ export class ActiveSessionGateway extends AbstractSessionGateway {
 
                         if (previousPointWithTask.task.isRequiredForNextPoint) {
                             const task = previousPointWithTask.task;
-                            const scorePercentage = (participantTask.scoreEarned / task.maxScorePointsCount) * 100;
 
-                            if (scorePercentage < task.successScorePointsPercent) {
-                                participant.participationStatus = ParticipantStatus.DISQUALIFIED;
-                                participant.rejectionReason = RejectionReason.REQUIRED_TASK_NOT_COMPLETED;
-                                await this.participantRepository.save(participant);
+                            if (task.taskType === QuestTaskType.PHOTO) {
+                                const taskWithPhoto = await this.participantTaskRepository.findOne({
+                                    where: {
+                                        participant: { participantId: participant.participantId },
+                                        task: { questTaskId: task.questTaskId },
+                                    },
+                                    relations: ['photo'],
+                                });
 
-                                await this.notifyParticipantDisqualified(sessionId, session.quest.organizer.userId, participant);
+                                if (taskWithPhoto?.photo?.isApproved === false) {
+                                    participant.participationStatus = ParticipantStatus.DISQUALIFIED;
+                                    participant.rejectionReason = RejectionReason.REQUIRED_TASK_NOT_COMPLETED;
+                                    await this.participantRepository.save(participant);
 
-                                console.log(`[checkAndPassPoint] User ${userId} disqualified - required task score ${scorePercentage.toFixed(1)}% < ${task.successScorePointsPercent}% at point ${previousPoint.questPointId}`);
-                                return null;
+                                    await this.notifyParticipantDisqualified(sessionId, session.quest.organizer.userId, participant);
+
+                                    console.log(`[checkAndPassPoint] User ${userId} disqualified - required photo task rejected at point ${previousPoint.questPointId}`);
+                                    return null;
+                                }
+                            } else {
+                                const scorePercentage = (participantTask.scoreEarned / task.maxScorePointsCount) * 100;
+
+                                if (scorePercentage < task.successScorePointsPercent) {
+                                    participant.participationStatus = ParticipantStatus.DISQUALIFIED;
+                                    participant.rejectionReason = RejectionReason.REQUIRED_TASK_NOT_COMPLETED;
+                                    await this.participantRepository.save(participant);
+
+                                    await this.notifyParticipantDisqualified(sessionId, session.quest.organizer.userId, participant);
+
+                                    console.log(`[checkAndPassPoint] User ${userId} disqualified - required task score ${scorePercentage.toFixed(1)}% < ${task.successScorePointsPercent}% at point ${previousPoint.questPointId}`);
+                                    return null;
+                                }
                             }
                         }
                     }

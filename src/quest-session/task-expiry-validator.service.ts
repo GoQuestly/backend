@@ -95,24 +95,46 @@ export class TaskExpiryValidatorService {
             if (task.isRequiredForNextPoint) {
                 const updatedTask = await this.participantTaskRepository.findOne({
                     where: { participantTaskId: participantTask.participantTaskId },
+                    relations: ['photo'],
                 });
 
-                const scorePercentage = (updatedTask.scoreEarned / task.maxScorePointsCount) * 100;
+                // Для фото завдань не дискваліфікуємо доки фото не промодеровано
+                if (task.taskType === QuestTaskType.PHOTO) {
+                    if (updatedTask.photo?.isApproved === false) {
+                        // Фото відхилено - дискваліфікуємо
+                        participant.participationStatus = ParticipantStatus.DISQUALIFIED;
+                        participant.rejectionReason = RejectionReason.REQUIRED_TASK_NOT_COMPLETED;
+                        await this.participantRepository.save(participant);
 
-                if (scorePercentage < task.successScorePointsPercent) {
-                    participant.participationStatus = ParticipantStatus.DISQUALIFIED;
-                    participant.rejectionReason = RejectionReason.REQUIRED_TASK_NOT_COMPLETED;
-                    await this.participantRepository.save(participant);
+                        await this.activeSessionGateway.notifyParticipantDisqualified(
+                            participant.session.questSessionId,
+                            participant.session.quest.organizer.userId,
+                            participant
+                        );
 
-                    await this.activeSessionGateway.notifyParticipantDisqualified(
-                        participant.session.questSessionId,
-                        participant.session.quest.organizer.userId,
-                        participant
-                    );
+                        this.logger.log(
+                            `Disqualified user ${participant.user.userId} - required photo task rejected`
+                        );
+                    }
+                    // Якщо isApproved === null (очікує модерації) або isApproved === true - не дискваліфікуємо
+                } else {
+                    const scorePercentage = (updatedTask.scoreEarned / task.maxScorePointsCount) * 100;
 
-                    this.logger.log(
-                        `Disqualified user ${participant.user.userId} - required task expired with insufficient score (${scorePercentage.toFixed(1)}% < ${task.successScorePointsPercent}%)`
-                    );
+                    if (scorePercentage < task.successScorePointsPercent) {
+                        participant.participationStatus = ParticipantStatus.DISQUALIFIED;
+                        participant.rejectionReason = RejectionReason.REQUIRED_TASK_NOT_COMPLETED;
+                        await this.participantRepository.save(participant);
+
+                        await this.activeSessionGateway.notifyParticipantDisqualified(
+                            participant.session.questSessionId,
+                            participant.session.quest.organizer.userId,
+                            participant
+                        );
+
+                        this.logger.log(
+                            `Disqualified user ${participant.user.userId} - required task expired with insufficient score (${scorePercentage.toFixed(1)}% < ${task.successScorePointsPercent}%)`
+                        );
+                    }
                 }
             }
 
