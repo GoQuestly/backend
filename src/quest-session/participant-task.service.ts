@@ -704,6 +704,9 @@ export class ParticipantTaskService {
             let passed = false;
 
             if (task.taskType === QuestTaskType.PHOTO) {
+                if (participantTask.photo?.isApproved === null) {
+                    return;
+                }
                 passed = participantTask.photo?.isApproved === true;
             } else if (task.taskType === QuestTaskType.CODE_WORD) {
                 passed = participantTask.scoreEarned > 0;
